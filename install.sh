@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # TekmerDB Install Script
-# Installs tekmerdb to /opt/tekmerdb
+# Installs TekmerDB to /opt/tekmerdb
 #
-# Prerequisites on the target machine:
-#   - wget
-#   - Pre-built binaries in target/release/ (build on dev machine with: cargo build --release)
+# Workflow:
+#   1. Clone or download the repo
+#   2. sudo ./install.sh
 #
-# Usage:
-#   sudo ./install.sh
+# The script will:
+#   - Read the version from Cargo.toml
+#   - Download the matching binaries from GitHub releases
+#   - Copy config and other files from the local repo
+#   - Download ML models from HuggingFace
 
 set -e
 
+REPO="raa82/tekmerdb"
 INSTALL_DIR="/opt/tekmerdb"
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -20,63 +24,100 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-info()    { echo -e "${GREEN}[tekmerdb]${NC} $1"; }
-warn()    { echo -e "${YELLOW}[tekmerdb]${NC} $1"; }
-error()   { echo -e "${RED}[tekmerdb]${NC} $1"; exit 1; }
+info()  { echo -e "${GREEN}[tekmerdb]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[tekmerdb]${NC} $1"; }
+error() { echo -e "${RED}[tekmerdb]${NC} $1"; exit 1; }
 
 # ── preflight ─────────────────────────────────────────────────────────────────
 
 info "TekmerDB installer starting..."
 
-# must be run as root or with sudo
 if [ "$EUID" -ne 0 ]; then
     error "Please run as root: sudo ./install.sh"
 fi
 
-# check dependencies
-for cmd in wget; do
+for cmd in wget curl; do
     if ! command -v "$cmd" &>/dev/null; then
-        error "Required command not found: $cmd — install it with: apt install wget"
+        error "Required command not found: $cmd — install it first (e.g. apt install $cmd)"
     fi
 done
 
-# check pre-built binaries exist
-if [ ! -f "$REPO_DIR/target/release/tekmerdb" ] || [ ! -f "$REPO_DIR/target/release/tekmerdb-mcp" ]; then
-    error "Pre-built binaries not found in target/release/
-  Build them on your development machine first:
-    cargo build --release
-  Then run this installer."
+# check we're running from the repo root
+if [ ! -f "$SCRIPT_DIR/Cargo.toml" ] || [ ! -f "$SCRIPT_DIR/tekmerdb-server.conf" ]; then
+    error "Run this script from the root of the tekmerdb repository."
 fi
 
-info "Pre-built binaries found."
+# ── read version from Cargo.toml ──────────────────────────────────────────────
+
+VERSION=$(grep '^version' "$SCRIPT_DIR/Cargo.toml" | head -1 | sed -E 's/version = "(.*)"/\1/' | tr -d ' ')
+if [ -z "$VERSION" ]; then
+    error "Could not read version from Cargo.toml"
+fi
+
+TAG="v$VERSION"
+info "Version: $TAG"
+
+# ── detect architecture ───────────────────────────────────────────────────────
+
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)  ARCH_LABEL="linux-x64" ;;
+    aarch64) ARCH_LABEL="linux-arm64" ;;
+    *) error "Unsupported architecture: $ARCH" ;;
+esac
+
+info "Architecture: $ARCH_LABEL"
+
+# ── download binaries from GitHub releases ────────────────────────────────────
+
+TARBALL="tekmerdb-${TAG}-${ARCH_LABEL}.tar.gz"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$TARBALL"
+TMP_DIR=$(mktemp -d)
+
+info "Downloading binaries from GitHub releases..."
+info "URL: $DOWNLOAD_URL"
+wget --progress=bar:force -O "$TMP_DIR/$TARBALL" "$DOWNLOAD_URL" 2>&1 \
+    || error "Download failed.
+  Make sure release $TAG exists at:
+  https://github.com/$REPO/releases/tag/$TAG"
+
+info "Extracting binaries..."
+tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
+
+# find extracted binaries — handle both flat and subdirectory extraction
+TEKMERDB_BIN=$(find "$TMP_DIR" -name "tekmerdb" -not -name "tekmerdb-mcp" -type f | head -1)
+TEKMERDB_MCP_BIN=$(find "$TMP_DIR" -name "tekmerdb-mcp" -type f | head -1)
+
+if [ -z "$TEKMERDB_BIN" ] || [ -z "$TEKMERDB_MCP_BIN" ]; then
+    error "Binaries not found in release tarball."
+fi
 
 # ── create install directory ──────────────────────────────────────────────────
 
 info "Creating install directory at $INSTALL_DIR..."
-mkdir -p "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR/models"
 mkdir -p "$INSTALL_DIR/data"
 mkdir -p "$INSTALL_DIR/log"
 
-# ── copy binaries ─────────────────────────────────────────────────────────────
+# ── install binaries ──────────────────────────────────────────────────────────
 
 info "Installing binaries..."
-cp "$REPO_DIR/target/release/tekmerdb"     "$INSTALL_DIR/tekmerdb"
-cp "$REPO_DIR/target/release/tekmerdb-mcp" "$INSTALL_DIR/tekmerdb-mcp"
+cp "$TEKMERDB_BIN"     "$INSTALL_DIR/tekmerdb"
+cp "$TEKMERDB_MCP_BIN" "$INSTALL_DIR/tekmerdb-mcp"
 chmod +x "$INSTALL_DIR/tekmerdb"
 chmod +x "$INSTALL_DIR/tekmerdb-mcp"
 
-# ── copy config file ──────────────────────────────────────────────────────────
+rm -rf "$TMP_DIR"
 
-if [ -f "$REPO_DIR/tekmerdb-server.conf" ]; then
-    if [ -f "$INSTALL_DIR/tekmerdb-server.conf" ]; then
-        warn "tekmerdb-server.conf already exists in $INSTALL_DIR — skipping to preserve your settings."
-        warn "New default config saved as $INSTALL_DIR/tekmerdb-server.conf.new"
-        cp "$REPO_DIR/tekmerdb-server.conf" "$INSTALL_DIR/tekmerdb-server.conf.new"
-    else
-        cp "$REPO_DIR/tekmerdb-server.conf" "$INSTALL_DIR/tekmerdb-server.conf"
-        info "Config file installed."
-    fi
+# ── install config from local repo ───────────────────────────────────────────
+
+if [ -f "$INSTALL_DIR/tekmerdb-server.conf" ]; then
+    warn "tekmerdb-server.conf already exists — preserving your settings."
+    warn "New default config saved as $INSTALL_DIR/tekmerdb-server.conf.new"
+    cp "$SCRIPT_DIR/tekmerdb-server.conf" "$INSTALL_DIR/tekmerdb-server.conf.new"
+else
+    cp "$SCRIPT_DIR/tekmerdb-server.conf" "$INSTALL_DIR/tekmerdb-server.conf"
+    info "Config file installed."
 fi
 
 # ── download models ───────────────────────────────────────────────────────────
@@ -87,50 +128,50 @@ download_model() {
     local name="$1"
     local url="$2"
     local dest="$3"
+    local size="$4"
 
     if [ -f "$dest" ]; then
-        info "Model already present: $name — skipping download."
+        info "Model already present: $name — skipping."
     else
-        info "Downloading $name (~$(echo $4) MB)..."
-        wget --progress=bar:force -O "$dest" "$url" 2>&1 || error "Failed to download $name"
+        info "Downloading $name (~${size}MB)..."
+        wget --progress=bar:force -O "$dest" "$url" 2>&1 \
+            || error "Failed to download $name"
         info "$name downloaded."
     fi
 }
 
 download_model \
-    "miniLM.onnx (sentence embedding model)" \
+    "miniLM.onnx" \
     "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx" \
     "$INSTALL_DIR/models/miniLM.onnx" \
     "90"
 
 download_model \
-    "tokenizer.json (MiniLM vocabulary)" \
+    "tokenizer.json" \
     "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json" \
     "$INSTALL_DIR/models/tokenizer.json" \
     "1"
 
 download_model \
-    "nli.onnx (NLI contradiction classifier)" \
+    "nli.onnx" \
     "https://huggingface.co/cross-encoder/nli-MiniLM2-L6-H768/resolve/main/onnx/model.onnx" \
     "$INSTALL_DIR/models/nli.onnx" \
     "328"
 
 download_model \
-    "nli_tokenizer.json (NLI vocabulary)" \
+    "nli_tokenizer.json" \
     "https://huggingface.co/cross-encoder/nli-MiniLM2-L6-H768/resolve/main/tokenizer.json" \
     "$INSTALL_DIR/models/nli_tokenizer.json" \
     "1"
 
-# ── set permissions ───────────────────────────────────────────────────────────
+# ── permissions ───────────────────────────────────────────────────────────────
 
-# allow the installing user (not just root) to write to data/ and log/
 REAL_USER="${SUDO_USER:-$USER}"
 chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data" "$INSTALL_DIR/log" 2>/dev/null || true
 
-# ── verify install ────────────────────────────────────────────────────────────
+# ── verify ────────────────────────────────────────────────────────────────────
 
 info "Verifying installation..."
-
 MISSING=0
 for f in tekmerdb tekmerdb-mcp tekmerdb-server.conf \
           models/miniLM.onnx models/tokenizer.json \
@@ -148,20 +189,20 @@ fi
 # ── done ──────────────────────────────────────────────────────────────────────
 
 echo ""
-info "Installation complete."
+info "TekmerDB $TAG installed successfully."
 echo ""
-echo "  Install location : $INSTALL_DIR"
-echo "  Engine binary    : $INSTALL_DIR/tekmerdb"
-echo "  MCP binary       : $INSTALL_DIR/tekmerdb-mcp"
-echo "  Config file      : $INSTALL_DIR/tekmerdb-server.conf"
-echo "  Models           : $INSTALL_DIR/models/"
-echo "  Data             : $INSTALL_DIR/data/  (created on first run)"
-echo "  Logs             : $INSTALL_DIR/log/   (created on first run)"
+echo "  Location : $INSTALL_DIR"
+echo "  Engine   : $INSTALL_DIR/tekmerdb"
+echo "  MCP      : $INSTALL_DIR/tekmerdb-mcp"
+echo "  Config   : $INSTALL_DIR/tekmerdb-server.conf"
+echo "  Models   : $INSTALL_DIR/models/"
+echo "  Data     : $INSTALL_DIR/data/"
+echo "  Logs     : $INSTALL_DIR/log/"
 echo ""
-echo "  To start the engine:"
+echo "  Start the engine:"
 echo "    cd $INSTALL_DIR && ./tekmerdb"
 echo ""
-echo "  To configure:"
+echo "  Configure:"
 echo "    edit $INSTALL_DIR/tekmerdb-server.conf"
-echo "    then restart the engine"
+echo "    restart the engine to apply changes"
 echo ""
