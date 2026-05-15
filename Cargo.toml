@@ -1,0 +1,30 @@
+[package]
+name = "pfodb"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tokio = { version = "1", features = ["full"] }
+bincode = "1"
+usearch = "2"
+ort = { version = "2.0.0-rc.12", features = ["download-binaries"] }
+anyhow = "1"
+tokenizers = "0.19"
+arrow = "54"
+parquet = "54"
+axum = "0.7"
+reqwest = { version = "0.12", features = ["json"] }
+
+[[bin]]
+name = "tekmerdb"
+path = "src/main.rs"
+
+[[bin]]
+name = "tekmerdb-mcp"
+path = "src/mcp/main.rs"

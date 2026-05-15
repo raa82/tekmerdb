@@ -1,0 +1,88 @@
+# =============================================================================
+# Energy Compliance Analyst — Docker stack
+#
+# Two containers:
+#   chromadb   — Chroma vector store (latest, 1.x Rust-based, v2 API)
+#   agent_rag  — Agent B: Python agent + chroma-mcp subprocess inside
+#
+# Ollama runs as a service on the HOST.
+#   agent_rag      → http://host.docker.internal:11434
+#   agent_tekmerdb → http://localhost:11434
+#
+# chromadb/chroma:latest is a Rust binary with no curl/wget/python.
+# Healthcheck is disabled — agent_rag polls the HTTP API before connecting.
+# =============================================================================
+
+services:
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ANONYMIZED_TELEMETRY=false
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - agent_net
+
+  agent_rag:
+    build:
+      context: ./agent-rag
+      dockerfile: Dockerfile
+    container_name: agent_rag
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - AGENT_PORT=8080
+      # Groq — reads from config.py mounted below, or set directly here:
+      # - GROQ_API_KEY=your_key_here
+      # Ollama fallback (used if GROQ_API_KEY not set):
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=mistral-nemo:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - chromadb
+    volumes:
+      - ./logs:/app/logs
+      - ./config.py:/app/config.py:ro
+    networks:
+      - agent_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 60s
+
+  ingest:
+    build:
+      context: ./agent-rag
+      dockerfile: Dockerfile.ingest
+    container_name: ingest
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - PDF_PATH=/data/report.pdf
+      - SOURCE_NAME=${SOURCE_NAME:-WorldEnergyOutlook2025}
+    depends_on:
+      - chromadb
+    networks:
+      - agent_net
+    profiles:
+      - ingest
+
+volumes:
+  chroma_data:
+
+networks:
+  agent_net:
+    driver: bridge
