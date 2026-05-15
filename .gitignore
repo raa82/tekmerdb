@@ -6,3 +6,4 @@ demo/config.py
 demo/logs/
 tests/
 docs/
+Cargo.lock
