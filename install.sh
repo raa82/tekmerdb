@@ -54,7 +54,7 @@ if [ -z "$VERSION" ]; then
     error "Could not read version from Cargo.toml"
 fi
 
-TAG="v$VERSION"
+TAG="$VERSION"
 info "Version: $TAG"
 
 # ── detect architecture ───────────────────────────────────────────────────────
