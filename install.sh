@@ -70,7 +70,7 @@ info "Architecture: $ARCH_LABEL"
 
 # ── download binaries from GitHub releases ────────────────────────────────────
 
-TARBALL="tekmerdb-${TAG}-${ARCH_LABEL}.tar.gz"
+TARBALL="tekmerdb-v${VERSION}-${ARCH_LABEL}.tar.gz"
 DOWNLOAD_URL="https://github.com/$REPO/releases/download/$TAG/$TARBALL"
 TMP_DIR=$(mktemp -d)
 
