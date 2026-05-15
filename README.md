@@ -1,6 +1,7 @@
 # TekmerDB
 <img width="1536" height="1024" alt="9fffbfec-4dbd-441d-ba6c-cebc03dc4152" src="https://github.com/user-attachments/assets/eb918a70-9371-401c-ae11-cf024886c24d" />
-> ⚠️ **MVP — Pre-release software.** TekmerDB is under active development. APIs may change, features are incomplete, and it has not been audited for production use. Use at your own risk.
+
+⚠️ **MVP — Pre-release software.** TekmerDB is under active development. APIs may change, features are incomplete, and it has not been audited for production use. Use at your own risk.
 
 ---
 
