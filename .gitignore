@@ -5,6 +5,7 @@ target/
 config
 demo/config.py
 demo/logs/
+log/
 tests/
 docs/
 Cargo.lock
