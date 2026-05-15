@@ -105,9 +105,9 @@ curl http://localhost:3000/search?q=North+Sea+wind+capacity
 
 ## MCP (AI agent interface)
 
-TekmerDB ships with a Model Context Protocol server. Connect any MCP-compatible AI agent — Claude Desktop, or any custom agent — directly to the engine.
+TekmerDB ships with a Model Context Protocol server. Connect any MCP-compatible AI agent directly to the engine.
 
-**Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+**Claude Desktop config**:
 
 ```json
 {
@@ -120,20 +120,6 @@ TekmerDB ships with a Model Context Protocol server. Connect any MCP-compatible 
 ```
 
 The agent can then insert facts, search, check source reliability, and update confidence — all through natural language.
-
----
-
-## Smoke tests
-
-After install, verify everything is working:
-
-```bash
-# HTTP API
-./tests/smoke-api.sh
-
-# MCP server
-./tests/smoke-mcp.sh
-```
 
 ---
 
