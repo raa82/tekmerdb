@@ -11,6 +11,7 @@ It gives AI agents reliable memory — storing not just facts, but how confident
 
 > **Why TekmerDB?** *Tekmer* comes from the Turkish word for singular, unique, one-of-a-kind. One storage layer that does what no other database does: reason about the reliability of what it holds.
 
+[**Check the wiki to get more details  about TekmerDB** ](https://github.com/raa82/tekmerdb/wiki)
 ---
 
 ## What it is. What it isn't.
