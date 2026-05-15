@@ -1,3 +1,4 @@
+use crate::log_info;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -18,9 +19,7 @@ pub struct ColdTier {
 impl ColdTier {
     pub fn new(path: &str) -> anyhow::Result<Self> {
         fs::create_dir_all(Path::new(path).parent().unwrap_or(Path::new(".")))?;
-        Ok(ColdTier {
-            path: path.to_string(),
-        })
+        Ok(ColdTier { path: path.to_string() })
     }
 
     fn schema() -> Arc<Schema> {
@@ -32,55 +31,26 @@ impl ColdTier {
             Field::new("corroboration_count", DataType::UInt32,  false),
             Field::new("domain",              DataType::Utf8,    false),
             Field::new("created_at",          DataType::Utf8,    false),
-            Field::new("source",              DataType::Utf8,    false),  // original string
-            Field::new("source_id",           DataType::Utf8,    false),  // resolved UUID
+            Field::new("source",              DataType::Utf8,    false),
+            Field::new("source_id",           DataType::Utf8,    false),
             Field::new("conflict_refs",       DataType::Utf8,    false),
         ]))
     }
 
     pub fn flush(&self, pfos: &[Pfo]) -> anyhow::Result<()> {
-        if pfos.is_empty() {
-            return Ok(());
-        }
+        if pfos.is_empty() { return Ok(()); }
 
         let schema = Self::schema();
 
-        let ids: StringArray = pfos.iter()
-            .map(|p| Some(p.id.to_string()))
-            .collect();
-
-        let seq_ids: UInt64Array = pfos.iter()
-            .map(|p| Some(p.seq_id))
-            .collect();
-
-        let claims: StringArray = pfos.iter()
-            .map(|p| Some(p.claim_text.as_str()))
-            .collect();
-
-        let confidences: Float32Array = pfos.iter()
-            .map(|p| Some(p.confidence))
-            .collect();
-
-        let corroborations: UInt32Array = pfos.iter()
-            .map(|p| Some(p.corroboration_count))
-            .collect();
-
-        let domains: StringArray = pfos.iter()
-            .map(|p| Some(format!("{:?}", p.domain)))
-            .collect();
-
-        let created_ats: StringArray = pfos.iter()
-            .map(|p| Some(p.created_at.to_rfc3339()))
-            .collect();
-
-        let sources: StringArray = pfos.iter()
-            .map(|p| Some(p.source.as_str()))
-            .collect();
-
-        let source_ids: StringArray = pfos.iter()
-            .map(|p| Some(p.source_id.to_string()))
-            .collect();
-
+        let ids: StringArray           = pfos.iter().map(|p| Some(p.id.to_string())).collect();
+        let seq_ids: UInt64Array       = pfos.iter().map(|p| Some(p.seq_id)).collect();
+        let claims: StringArray        = pfos.iter().map(|p| Some(p.claim_text.as_str())).collect();
+        let confidences: Float32Array  = pfos.iter().map(|p| Some(p.confidence)).collect();
+        let corroborations: UInt32Array = pfos.iter().map(|p| Some(p.corroboration_count)).collect();
+        let domains: StringArray       = pfos.iter().map(|p| Some(format!("{:?}", p.domain))).collect();
+        let created_ats: StringArray   = pfos.iter().map(|p| Some(p.created_at.to_rfc3339())).collect();
+        let sources: StringArray       = pfos.iter().map(|p| Some(p.source.as_str())).collect();
+        let source_ids: StringArray    = pfos.iter().map(|p| Some(p.source_id.to_string())).collect();
         let conflict_refs: StringArray = pfos.iter()
             .map(|p| Some(serde_json::to_string(&p.conflict_refs).unwrap_or_default()))
             .collect();
@@ -88,23 +58,15 @@ impl ColdTier {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(ids),
-                Arc::new(seq_ids),
-                Arc::new(claims),
-                Arc::new(confidences),
-                Arc::new(corroborations),
-                Arc::new(domains),
-                Arc::new(created_ats),
-                Arc::new(sources),
-                Arc::new(source_ids),
+                Arc::new(ids), Arc::new(seq_ids), Arc::new(claims),
+                Arc::new(confidences), Arc::new(corroborations), Arc::new(domains),
+                Arc::new(created_ats), Arc::new(sources), Arc::new(source_ids),
                 Arc::new(conflict_refs),
             ],
         )?;
 
         let file = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
+            .create(true).write(true).truncate(true)
             .open(&self.path)?;
 
         let props = WriterProperties::builder().build();
@@ -112,14 +74,12 @@ impl ColdTier {
         writer.write(&batch)?;
         writer.close()?;
 
-        println!("[cold tier] flushed {} PFO(s) to parquet", pfos.len());
+        log_info!("[cold tier] flushed {} PFO(s) to parquet", pfos.len());
         Ok(())
     }
 
     pub fn read(&self) -> anyhow::Result<(Vec<Pfo>, u64)> {
-        if !Path::new(&self.path).exists() {
-            return Ok((vec![], 0));
-        }
+        if !Path::new(&self.path).exists() { return Ok((vec![], 0)); }
 
         let file = fs::File::open(&self.path)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
@@ -130,7 +90,6 @@ impl ColdTier {
 
         while let Some(batch) = reader.next() {
             let batch = batch?;
-
             let ids        = batch.column(0).as_any().downcast_ref::<StringArray>().unwrap();
             let seq_ids    = batch.column(1).as_any().downcast_ref::<UInt64Array>().unwrap();
             let claims     = batch.column(2).as_any().downcast_ref::<StringArray>().unwrap();
@@ -167,11 +126,9 @@ impl ColdTier {
                     conflict_refs: conflict_refs_vec,
                     dirty: false,
                 };
-
                 pfos.push(pfo);
             }
         }
-
         Ok((pfos, max_seq))
     }
 }

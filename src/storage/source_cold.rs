@@ -1,3 +1,4 @@
+use crate::log_info;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -96,7 +97,7 @@ impl SourceColdTier {
         writer.write(&batch)?;
         writer.close()?;
 
-        println!("[source_cold] flushed {} source(s) to parquet", records.len());
+        log_info!("[source_cold] flushed {} source(s) to parquet", records.len());
         Ok(())
     }
 

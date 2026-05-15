@@ -1,5 +1,5 @@
 [package]
-name = "pfodb"
+name = "tekmerdb"
 version = "0.1.0"
 edition = "2024"
 
@@ -20,6 +20,7 @@ arrow = "54"
 parquet = "54"
 axum = "0.7"
 reqwest = { version = "0.12", features = ["json"] }
+toml = "0.8"
 
 [[bin]]
 name = "tekmerdb"

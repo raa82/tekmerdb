@@ -1,3 +1,4 @@
+use crate::{log_info, log_warn, log_error};
 use crate::storage::hot::HotTier;
 use crate::engine::nli::NliClassifier;
 use crate::engine::source_registry::SourceRegistry;
@@ -22,11 +23,11 @@ fn classify_relationship(
     let (prob_c_ab, prob_e_ab, prob_n_ab) = nli.classify_probs(claim_a, claim_b)?;
     let (prob_c_ba, prob_e_ba, prob_n_ba) = nli.classify_probs(claim_b, claim_a)?;
 
-    println!(
+    log_info!(
         "[nli] A→B  contradiction: {:.3}  entailment: {:.3}  neutral: {:.3}",
         prob_c_ab, prob_e_ab, prob_n_ab
     );
-    println!(
+    log_info!(
         "[nli] B→A  contradiction: {:.3}  entailment: {:.3}  neutral: {:.3}",
         prob_c_ba, prob_e_ba, prob_n_ba
     );
@@ -41,14 +42,14 @@ fn classify_relationship(
 
     // synonym corroboration — very high cosine + moderate entailment both ways
     if similarity > 0.95 && prob_e_ab > 0.3 && prob_e_ba > 0.3 {
-        println!("[sweep] synonym corroboration — very high cosine + moderate entailment");
+        log_info!("[sweep] synonym corroboration — very high cosine + moderate entailment");
         return Ok(ClaimRelationship::Corroboration);
     }
 
     // subsumption with cosine tiebreaker at very high similarity
     if (prob_e_ab > 0.5 && prob_n_ba > 0.5) || (prob_e_ba > 0.5 && prob_n_ab > 0.5) {
         if similarity > 0.95 {
-            println!("[sweep] cosine tiebreaker — NLI asymmetry overridden by very high similarity");
+            log_info!("[sweep] cosine tiebreaker — NLI asymmetry overridden by very high similarity");
             return Ok(ClaimRelationship::Corroboration);
         }
         return Ok(ClaimRelationship::Subsumption);
@@ -94,7 +95,7 @@ pub fn evaluate_new_pfo(
     let score_summary: Vec<String> = scores.iter().enumerate()
         .map(|(i, (_, s))| format!("{}/{}: {:.3}", i + 1, scores.len(), s))
         .collect();
-    println!("[sweep] seq:{} similarities — {}",
+    log_info!("[sweep] seq:{} similarities — {}",
         new_pfo.seq_id,
         if score_summary.is_empty() { "none".to_string() } else { score_summary.join(" | ") });
 
@@ -109,12 +110,12 @@ pub fn evaluate_new_pfo(
         let conf_new  = new_pfo.confidence;
         let conf_cand = candidate.confidence;
 
-        println!("[sweep] NLI check — similarity: {:.3} — '{}' vs '{}'",
+        log_info!("[sweep] NLI check — similarity: {:.3} — '{}' vs '{}'",
             similarity, new_pfo.claim_text, candidate.claim_text);
 
         match classify_relationship(nli, &new_pfo.claim_text, &candidate.claim_text, *similarity) {
             Ok(ClaimRelationship::Contradiction) => {
-                println!("[sweep] CONFLICT — clear contradiction");
+                log_info!("[sweep] CONFLICT — clear contradiction");
                 if let Some(pfo) = tier.store.get_mut(&new_id) {
                     pfo.confidence = conf_new * 0.75;
                     pfo.dirty = true;
@@ -136,14 +137,14 @@ pub fn evaluate_new_pfo(
                 }
             }
             Ok(ClaimRelationship::Corroboration) => {
-                println!("[sweep] CORROBORATION — same fact confirmed");
+                log_info!("[sweep] CORROBORATION — same fact confirmed");
                 // use live effective_weight of new PFO's source
                 let weight = {
                     let reg = source_registry.lock().unwrap();
                     reg.effective_weight(&new_pfo.source_id)
                 };
                 let new_conf = 1.0 - (1.0 - conf_new) * (1.0 - weight);
-                println!("[sweep] corroboration weight: {:.3} → new confidence: {:.3}",
+                log_info!("[sweep] corroboration weight: {:.3} → new confidence: {:.3}",
                     weight, new_conf);
                 if let Some(pfo) = tier.store.get_mut(&new_id) {
                     pfo.confidence = new_conf;
@@ -164,10 +165,10 @@ pub fn evaluate_new_pfo(
                 }
             }
             Ok(ClaimRelationship::Subsumption) => {
-                println!("[sweep] SUBSUMPTION — different scope, storing independently");
+                log_info!("[sweep] SUBSUMPTION — different scope, storing independently");
             }
             Ok(ClaimRelationship::Uncertain) => {
-                println!("[sweep] UNCERTAIN — small confidence adjustment");
+                log_warn!("[sweep] UNCERTAIN — weak signal, small confidence penalty applied");
                 if let Some(pfo) = tier.store.get_mut(&new_id) {
                     pfo.confidence = conf_new * 0.95;
                     pfo.dirty = true;
@@ -178,10 +179,10 @@ pub fn evaluate_new_pfo(
                 }
             }
             Ok(ClaimRelationship::Unrelated) => {
-                println!("[sweep] unrelated — ignoring");
+                log_info!("[sweep] unrelated — ignoring");
             }
             Err(e) => {
-                println!("[sweep] NLI error: {}", e);
+                log_error!("[sweep] NLI error: {}", e);
             }
         }
     }

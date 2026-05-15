@@ -1,3 +1,4 @@
+use crate::{log_info, log_warn, log_error};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
@@ -76,6 +77,10 @@ fn update_centroid(centroid: &mut Vec<f32>, count: usize, new_fp: &[f32]) {
 }
 
 impl Engine {
+    // Convenience constructor using built-in defaults.
+    // Used by external callers embedding TekmerDB without a config file.
+    // main.rs uses new_with_config directly after loading tekmerdb-server.conf.
+    #[allow(dead_code)]
     pub fn new(crb_path: &str) -> anyhow::Result<Self> {
         Self::new_with_config(crb_path, EngineConfig::default())
     }
@@ -92,12 +97,12 @@ impl Engine {
         for pfo in parquet_pfos {
             hot.store.insert(pfo.id, pfo);
         }
-        println!("[engine] loaded {} PFO(s) from Parquet — max seq: {}",
+        log_info!("[engine] loaded {} PFO(s) from Parquet — max seq: {}",
             parquet_count, parquet_max_seq);
 
         // 2. load HNSW index
         if let Err(e) = hot.load_index(HNSW_INDEX_PATH) {
-            println!("[engine] HNSW index load failed: {} — starting fresh", e);
+            log_warn!("[engine] HNSW index load failed: {} — starting fresh", e);
         }
 
         // 3. replay CRB
@@ -116,7 +121,7 @@ impl Engine {
                 crb_replayed += 1;
             }
         }
-        println!("[engine] replayed {} new PFO(s) from CRB", crb_replayed);
+        log_info!("[engine] replayed {} new PFO(s) from CRB", crb_replayed);
 
         // 4. rebuild domain centroid
         let mut centroid: Vec<f32> = vec![];
@@ -128,9 +133,9 @@ impl Engine {
             }
         }
         if centroid_count > 0 {
-            println!("[engine] domain centroid rebuilt from {} existing PFO(s)", centroid_count);
+            log_info!("[engine] domain centroid rebuilt from {} existing PFO(s)", centroid_count);
         } else {
-            println!("[engine] cold start — domain centroid will build from first {} inserts",
+            log_info!("[engine] cold start — domain centroid will build from first {} inserts",
                 config.cold_start_inserts);
         }
 
@@ -139,7 +144,7 @@ impl Engine {
         let now_epoch = current_epoch();
         let (stored_epoch, stored_seq) = decompose_seq_id(max_seq);
         let initial_seq = if stored_epoch == now_epoch { stored_seq } else { 0 };
-        println!("[engine] seq restored — epoch: {} seq: {}", now_epoch, initial_seq);
+        log_info!("[engine] seq restored — epoch: {} seq: {}", now_epoch, initial_seq);
 
         let seq = Arc::new(AtomicU32::new(initial_seq));
         let hot = Arc::new(Mutex::new(hot));
@@ -158,7 +163,7 @@ impl Engine {
                 }
                 let all_pfos = hot_for_flush.lock().unwrap().get_all();
                 if let Err(e) = cold.flush(&all_pfos) {
-                    println!("[cold tier] flush error: {}", e);
+                    log_error!("[cold tier] flush error: {}", e);
                     continue;
                 }
                 {
@@ -170,10 +175,10 @@ impl Engine {
                 {
                     let tier = hot_for_flush.lock().unwrap();
                     if let Err(e) = tier.save_index(HNSW_INDEX_PATH) {
-                        println!("[hot tier] HNSW save error: {}", e);
+                        log_error!("[hot tier] HNSW save error: {}", e);
                     }
                 }
-                println!("[cold tier] flushed {} dirty PFO(s)", dirty_pfos.len());
+                log_info!("[cold tier] flushed {} dirty PFO(s)", dirty_pfos.len());
             }
         });
 
@@ -208,11 +213,11 @@ impl Engine {
                 let all = reg.get_all_records();
                 drop(reg);
                 if let Err(e) = source_cold.flush(&all) {
-                    println!("[source_cold] flush error: {}", e);
+                    log_error!("[source_cold] flush error: {}", e);
                     continue;
                 }
                 source_registry_for_flush.lock().unwrap().mark_clean();
-                println!("[source_cold] flushed {} dirty source(s)", dirty.len());
+                log_info!("[source_cold] flushed {} dirty source(s)", dirty.len());
             }
         });
 
@@ -246,17 +251,18 @@ impl Engine {
         if count >= self.config.cold_start_inserts {
             let centroid = self.domain_centroid.lock().unwrap();
             let similarity = cosine_similarity(&pfo.semantic_fingerprint, &centroid);
-            println!("[engine] domain similarity: {:.3} (threshold: {:.2})",
+            log_info!("[engine] domain similarity: {:.3} (threshold: {:.2})",
                 similarity, self.config.domain_threshold);
             if similarity < self.config.domain_threshold {
-                println!("[engine] DOMAIN REJECTED — claim outside configured domain");
+                log_warn!("[engine] DOMAIN REJECTED — similarity {:.3} below threshold {:.2}",
+                    similarity, self.config.domain_threshold);
                 return Ok(EngineInsertResult::DomainRejected(
                     format!("claim similarity {:.3} below domain threshold {:.2}",
                         similarity, self.config.domain_threshold)
                 ));
             }
         } else {
-            println!("[engine] cold start ({}/{}) — domain check skipped",
+            log_info!("[engine] cold start ({}/{}) — domain check skipped",
                 count + 1, self.config.cold_start_inserts);
         }
 
@@ -277,7 +283,7 @@ impl Engine {
                     self.centroid_count.fetch_add(1, Ordering::SeqCst);
                 }
                 if let Err(e) = tier.save_index(HNSW_INDEX_PATH) {
-                    println!("[hot tier] HNSW save error: {}", e);
+                    log_error!("[hot tier] HNSW save error: {}", e);
                 }
                 drop(tier);
                 self.crb.write(&pfo)?;
@@ -287,7 +293,7 @@ impl Engine {
                 Ok(EngineInsertResult::Inserted(id))
             }
             InsertResult::Duplicate(existing_id) => {
-                println!("[engine] duplicate detected — existing id: {}", existing_id);
+                log_info!("[engine] duplicate detected — existing id: {}", existing_id);
                 Ok(EngineInsertResult::Duplicate(*existing_id))
             }
         }
@@ -304,7 +310,7 @@ impl Engine {
                 let previous = pfo.confidence;
                 pfo.confidence = new_confidence;
                 pfo.dirty = true;
-                println!("[engine] manual confidence update — id: {} {:.3} → {:.3}",
+                log_info!("[engine] manual confidence update — id: {} {:.3} → {:.3}",
                     id, previous, new_confidence);
                 Some(previous)
             }

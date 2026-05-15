@@ -1,0 +1,28 @@
+2026-05-15T12:18:08Z [INFO] [tekmerdb] starting...
+2026-05-15T12:18:08Z [INFO] [engine] loaded 5796 PFO(s) from Parquet — max seq: 7639694784524715276
+2026-05-15T12:18:08Z [INFO] [engine] replayed 0 new PFO(s) from CRB
+2026-05-15T12:18:08Z [INFO] [engine] cold start — domain centroid will build from first 10 inserts
+2026-05-15T12:18:08Z [INFO] [engine] seq restored — epoch: 1778847488 seq: 0
+2026-05-15T12:18:08Z [INFO] [source_registry] restored 577 source(s) — seq: 973
+2026-05-15T12:18:09Z [INFO] [tekmerdb] listening on http://127.0.0.1:3000
+2026-05-15T12:18:25Z [INFO] [source_registry] new source registered — name: 'reuters energy desk' (normalised from: 'Reuters Energy Desk') id: f76b4341-5fbc-42ef-9ec0-09b752ee8bf9 effective_weight: 0.500
+2026-05-15T12:18:25Z [INFO] [engine] cold start (1/10) — domain check skipped
+2026-05-15T12:18:25Z [INFO] [sweep] seq:7640091785531752449 similarities — 1/20: 0.761 | 2/20: 0.760 | 3/20: 0.757 | 4/20: 0.751 | 5/20: 0.748 | 6/20: 0.747 | 7/20: 0.743 | 8/20: 0.738 | 9/20: 0.735 | 10/20: 0.734 | 11/20: 0.733 | 12/20: 0.733 | 13/20: 0.733 | 14/20: 0.732 | 15/20: 0.726 | 16/20: 0.725 | 17/20: 0.724 | 18/20: 0.724 | 19/20: 0.723 | 20/20: 0.722
+2026-05-15T12:18:28Z [INFO] [source_cold] flushed 578 source(s) to parquet
+2026-05-15T12:18:28Z [INFO] [source_cold] flushed 1 dirty source(s)
+2026-05-15T12:18:28Z [INFO] [cold tier] flushed 5797 PFO(s) to parquet
+2026-05-15T12:18:28Z [INFO] [cold tier] flushed 1 dirty PFO(s)
+2026-05-15T13:13:36Z [INFO] [source_registry] new source registered — name: 'scottish energy council' (normalised from: 'Scottish Energy Council') id: 09f6a47b-bc51-4989-8f24-6f18cd8b3174 effective_weight: 0.500
+2026-05-15T13:13:36Z [INFO] [engine] cold start (2/10) — domain check skipped
+2026-05-15T13:13:36Z [INFO] [sweep] seq:7640091785531752450 similarities — 1/20: 0.840 | 2/20: 0.741 | 3/20: 0.734 | 4/20: 0.725 | 5/20: 0.725 | 6/20: 0.716 | 7/20: 0.715 | 8/20: 0.708 | 9/20: 0.703 | 10/20: 0.703 | 11/20: 0.702 | 12/20: 0.702 | 13/20: 0.699 | 14/20: 0.698 | 15/20: 0.698 | 16/20: 0.698 | 17/20: 0.696 | 18/20: 0.695 | 19/20: 0.693 | 20/20: 0.693
+2026-05-15T13:13:38Z [INFO] [source_cold] flushed 579 source(s) to parquet
+2026-05-15T13:13:38Z [INFO] [source_cold] flushed 1 dirty source(s)
+2026-05-15T13:13:39Z [INFO] [cold tier] flushed 5798 PFO(s) to parquet
+2026-05-15T13:13:39Z [INFO] [cold tier] flushed 1 dirty PFO(s)
+2026-05-15T13:17:54Z [INFO] [tekmerdb] starting...
+2026-05-15T13:17:54Z [INFO] [engine] loaded 5798 PFO(s) from Parquet — max seq: 7640091785531752450
+2026-05-15T13:17:54Z [INFO] [engine] replayed 0 new PFO(s) from CRB
+2026-05-15T13:17:54Z [INFO] [engine] cold start — domain centroid will build from first 10 inserts
+2026-05-15T13:17:54Z [INFO] [engine] seq restored — epoch: 1778851074 seq: 0
+2026-05-15T13:17:54Z [INFO] [source_registry] restored 579 source(s) — seq: 975
+2026-05-15T13:17:55Z [INFO] [tekmerdb] listening on http://127.0.0.1:3000

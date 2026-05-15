@@ -4,18 +4,27 @@ mod api;
 
 use std::sync::{Arc, Mutex};
 use engine::engine::Engine;
+use engine::config::EngineConfig;
 use api::router;
 
 #[tokio::main]
 async fn main() {
-    println!("pfodb starting...");
+    // initialise server logger — all output goes to log/server.log
+    engine::logger::init("log", "server.log");
 
-    let engine = Engine::new("data/crb.bin").expect("failed to start engine");
+    log_info!("[tekmerdb] starting...");
+
+    // load config from file — falls back to defaults if missing
+    let config = EngineConfig::load("tekmerdb-server.conf");
+    let bind_address = config.bind_address();
+
+    let engine = Engine::new_with_config("data/crb.bin", config)
+        .expect("failed to start engine");
     let state = Arc::new(Mutex::new(engine));
 
     let app = router(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("pfodb listening on http://0.0.0.0:3000");
+    let listener = tokio::net::TcpListener::bind(&bind_address).await.unwrap();
+    log_info!("[tekmerdb] listening on http://{}", bind_address);
     axum::serve(listener, app).await.unwrap();
 }

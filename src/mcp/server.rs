@@ -1,3 +1,4 @@
+use crate::{mcp_log_info, mcp_log_error};
 // pfodb MCP server
 // Transport: stdio JSON-RPC (Model Context Protocol standard)
 // All tool calls forward to the pfodb HTTP API on localhost:3000
@@ -189,7 +190,7 @@ fn tools_list() -> Value {
 
 async fn http_get(client: &reqwest::Client, path: &str) -> anyhow::Result<Value> {
     let url = format!("{}{}", ENGINE_URL, path);
-    eprintln!("[pfodb-mcp] GET {}", url);
+    mcp_log_info!("[tekmerdb-mcp] GET {}", url);
     let resp = client.get(&url).send().await?;
     let status = resp.status();
     let body: Value = resp.json().await?;
@@ -201,7 +202,7 @@ async fn http_get(client: &reqwest::Client, path: &str) -> anyhow::Result<Value>
 
 async fn http_post(client: &reqwest::Client, path: &str, body: &Value) -> anyhow::Result<Value> {
     let url = format!("{}{}", ENGINE_URL, path);
-    eprintln!("[pfodb-mcp] POST {} {}", url, body);
+    mcp_log_info!("[tekmerdb-mcp] POST {} {}", url, body);
     let resp = client.post(&url).json(body).send().await?;
     let status = resp.status();
     let resp_body: Value = resp.json().await?;
@@ -213,7 +214,7 @@ async fn http_post(client: &reqwest::Client, path: &str, body: &Value) -> anyhow
 
 async fn http_patch(client: &reqwest::Client, path: &str, body: &Value) -> anyhow::Result<Value> {
     let url = format!("{}{}", ENGINE_URL, path);
-    eprintln!("[pfodb-mcp] PATCH {} {}", url, body);
+    mcp_log_info!("[tekmerdb-mcp] PATCH {} {}", url, body);
     let resp = client.patch(&url).json(body).send().await?;
     let status = resp.status();
     let resp_body: Value = resp.json().await?;
@@ -352,11 +353,11 @@ async fn handle_request(client: &reqwest::Client, req: RpcRequest) -> RpcRespons
 
             let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
-            eprintln!("[pfodb-mcp] tool call: {} args: {}", tool_name, args);
+            mcp_log_info!("[tekmerdb-mcp] tool call: {} args: {}", tool_name, args);
 
             match dispatch_tool(client, tool_name, &args).await {
                 Ok(result) => {
-                    eprintln!("[pfodb-mcp] tool result: {}", result);
+                    mcp_log_info!("[tekmerdb-mcp] tool result: {}", result);
                     RpcResponse::ok(id, json!({
                         "content": [
                             {
@@ -368,14 +369,14 @@ async fn handle_request(client: &reqwest::Client, req: RpcRequest) -> RpcRespons
                     }))
                 }
                 Err(e) => {
-                    eprintln!("[pfodb-mcp] tool error: {}", e);
+                    mcp_log_error!("[tekmerdb-mcp] tool error: {}", e);
                     RpcResponse::err(id, -32000, e.to_string())
                 }
             }
         }
 
         other => {
-            eprintln!("[pfodb-mcp] unknown method: {}", other);
+            mcp_log_info!("[tekmerdb-mcp] unknown method: {}", other);
             RpcResponse::err(id, -32601, format!("method not found: {}", other))
         }
     }
@@ -389,7 +390,7 @@ pub async fn run() {
     let mut stdout = tokio::io::stdout();
     let mut reader = BufReader::new(stdin).lines();
 
-    eprintln!("[pfodb-mcp] ready — reading from stdin");
+    mcp_log_info!("[tekmerdb-mcp] ready — reading from stdin");
 
     while let Ok(Some(line)) = reader.next_line().await {
         let line = line.trim().to_string();
@@ -397,12 +398,12 @@ pub async fn run() {
             continue;
         }
 
-        eprintln!("[pfodb-mcp] received: {}", line);
+        mcp_log_info!("[tekmerdb-mcp] received: {}", line);
 
         let req: RpcRequest = match serde_json::from_str(&line) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("[pfodb-mcp] parse error: {}", e);
+                mcp_log_error!("[tekmerdb-mcp] parse error: {}", e);
                 let err = RpcResponse::err(
                     Value::Null,
                     -32700,
@@ -418,17 +419,17 @@ pub async fn run() {
 
         // notifications have no id and require no response
         if req.method.starts_with("notifications/") {
-            eprintln!("[pfodb-mcp] notification received: {}", req.method);
+            mcp_log_info!("[tekmerdb-mcp] notification received: {}", req.method);
             continue;
         }
 
         let resp = handle_request(&client, req).await;
         let mut out = serde_json::to_string(&resp).unwrap();
         out.push('\n');
-        eprintln!("[pfodb-mcp] sending: {}", out.trim());
+        mcp_log_info!("[tekmerdb-mcp] sending: {}", out.trim());
         stdout.write_all(out.as_bytes()).await.unwrap();
         stdout.flush().await.unwrap();
     }
 
-    eprintln!("[pfodb-mcp] stdin closed — exiting");
+    mcp_log_info!("[tekmerdb-mcp] stdin closed — exiting");
 }
