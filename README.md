@@ -60,6 +60,7 @@ curl -s -X POST http://localhost:3000/pfo \
 
 A vector database returns both claims with identical authority. TekmerDB flags the conflict, names the source, reduces confidence on both, and preserves the full provenance chain. No hallucination. No silent resolution.
 
+[**Check the wiki to get more details  about TekmerDB** ](https://github.com/raa82/tekmerdb/wiki)
 ---
 
 ## What it is. What it isn't.
