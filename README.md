@@ -10,6 +10,22 @@ TekmerDB gives AI agents reliable memory — storing not just facts, but how con
 
 ---
 
+## Navigation
+
+- [Who this is for](#who-this-is-for)
+- [What it is. What it isn't.](#what-it-is-what-it-isnt)
+- [How is it different from a vector database?](#how-is-it-different-from-a-vector-database)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [See it in 30 seconds](#see-it-in-30-seconds)
+- [Benchmark: TekmerDB vs RAG](#benchmark-tekmerdb-vs-rag)
+- [MCP — connect any AI agent](#mcp--connect-any-ai-agent)
+- [Learn more](#learn-more)
+- [License](#license)
+- 📖 [Full Wiki — deep documentation](https://github.com/raa82/tekmerdb/wiki)
+
+---
+
 ## Who this is for
 
 **AI engineers and developers** — drop TekmerDB behind your RAG pipeline. Your agent gets a memory layer that knows when two sources disagree instead of returning both with equal confidence.
@@ -18,49 +34,6 @@ TekmerDB gives AI agents reliable memory — storing not just facts, but how con
 
 **Business and compliance** — deploying AI in a regulated industry (energy, healthcare, legal, finance)? TekmerDB is the audit trail and provenance layer that makes AI decisions traceable. Read [Why Conflicts Are More Valuable Than Clean Answers](https://github.com/raa82/tekmerdb/wiki#why-conflicts-are-more-valuable-than-clean-answers).
 
----
-
-## See it in 30 seconds
-
-Insert two contradicting facts. Watch what happens.
-
-```bash
-# Fact from a trusted source
-curl -s -X POST http://localhost:3000/pfo \
-  -H "Content-Type: application/json" \
-  -d '{
-    "claim_text": "Global coal demand will fall 20% by 2035",
-    "confidence": 0.8,
-    "source": "IEA World Energy Outlook",
-    "domain": "CriticalInfrastructure"
-  }'
-
-# Contradicting claim from a lobby group
-curl -s -X POST http://localhost:3000/pfo \
-  -H "Content-Type: application/json" \
-  -d '{
-    "claim_text": "Global coal demand will increase 40% by 2035",
-    "confidence": 0.8,
-    "source": "CoalIndustryLobby2024",
-    "domain": "CriticalInfrastructure"
-  }'
-```
-
-**Both facts flagged. Both confidences reduced. Conflict preserved. Source named.**
-
-```json
-{
-  "id": "a1b2c3...",
-  "confidence": 0.52,
-  "conflict_refs": ["e5f6g7..."],
-  "corroboration_count": 0,
-  "source": "CoalIndustryLobby2024"
-}
-```
-
-A vector database returns both claims with identical authority. TekmerDB flags the conflict, names the source, reduces confidence on both, and preserves the full provenance chain. No hallucination. No silent resolution.
-
-[**Check the wiki to get more details  about TekmerDB** ](https://github.com/raa82/tekmerdb/wiki)
 ---
 
 ## What it is. What it isn't.
@@ -90,28 +63,6 @@ A vector database finds similar things fast. It has no concept of whether those 
 | Deployment | Cloud-dependent | Single air-gapped binary |
 
 **TekmerDB is additive, not a replacement.** Pipe the outputs of your existing RAG pipeline into TekmerDB and your agent gains a memory layer that knows what to trust.
-
----
-
-## Benchmark: TekmerDB vs RAG
-
-9 compliance questions. Same LLM. Real 510-page IEA document. Three industry sources.
-
-| Test | Question | Winner |
-|---|---|---|
-| 1 | Global energy demand by 2035 | TekmerDB — 7 conflicts flagged, RAG blended contradictions silently |
-| 2 | 1.5°C climate target | TekmerDB — contradictions detected, confidence 0.72 |
-| 3 | EU AI Act certification | TekmerDB — clear NO with reasons, RAG returned irrelevant data |
-| 4 | **Poisoned data (lobby claim)** | **TekmerDB** — fake claim flagged and source named. RAG opened with it as fact. |
-| 5 | Source audit trail | Tie |
-| 6 | Regulatory submission decision | TekmerDB — compliance verdict with confidence score and source trace |
-| 7 | 2024 actual energy demand | TekmerDB — correct source retrieved, RAG returned projections |
-| 8 | Oil demand 2035 and 2050 | TekmerDB — 2 conflicts flagged correctly |
-| 9 | Fastest growing energy sources | Tie |
-
-**Final score: TekmerDB 7 — RAG 0 — Ties 2**
-
-[Read the full comparison report →](https://github.com/raa82/tekmerdb/wiki/Benchmark:-TekmerDB-vs-RAG)
 
 ---
 
@@ -167,6 +118,70 @@ curl "http://localhost:3000/search?q=North+Sea+wind+capacity&k=5"
 # check source reliability
 curl "http://localhost:3000/source?name=IEA+Energy+Report"
 ```
+
+---
+
+## See it in 30 seconds
+
+Insert two contradicting facts. Watch what happens.
+
+```bash
+# Fact from a trusted source
+curl -s -X POST http://localhost:3000/pfo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "claim_text": "Global coal demand will fall 20% by 2035",
+    "confidence": 0.8,
+    "source": "IEA World Energy Outlook",
+    "domain": "CriticalInfrastructure"
+  }'
+
+# Contradicting claim from a lobby group
+curl -s -X POST http://localhost:3000/pfo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "claim_text": "Global coal demand will increase 40% by 2035",
+    "confidence": 0.8,
+    "source": "CoalIndustryLobby2024",
+    "domain": "CriticalInfrastructure"
+  }'
+```
+
+**Both facts flagged. Both confidences reduced. Conflict preserved. Source named.**
+
+```json
+{
+  "id": "a1b2c3...",
+  "confidence": 0.52,
+  "conflict_refs": ["e5f6g7..."],
+  "corroboration_count": 0,
+  "source": "CoalIndustryLobby2024"
+}
+```
+
+A vector database returns both claims with identical authority. TekmerDB flags the conflict, names the source, reduces confidence on both, and preserves the full provenance chain. No hallucination. No silent resolution.
+
+---
+
+## Benchmark: TekmerDB vs RAG
+
+9 compliance questions. Same LLM. Real 510-page IEA document. Three industry sources.
+
+| Test | Question | Winner |
+|---|---|---|
+| 1 | Global energy demand by 2035 | TekmerDB — 7 conflicts flagged, RAG blended contradictions silently |
+| 2 | 1.5°C climate target | TekmerDB — contradictions detected, confidence 0.72 |
+| 3 | EU AI Act certification | TekmerDB — clear NO with reasons, RAG returned irrelevant data |
+| 4 | **Poisoned data (lobby claim)** | **TekmerDB** — fake claim flagged and source named. RAG opened with it as fact. |
+| 5 | Source audit trail | Tie |
+| 6 | Regulatory submission decision | TekmerDB — compliance verdict with confidence score and source trace |
+| 7 | 2024 actual energy demand | TekmerDB — correct source retrieved, RAG returned projections |
+| 8 | Oil demand 2035 and 2050 | TekmerDB — 2 conflicts flagged correctly |
+| 9 | Fastest growing energy sources | Tie |
+
+**Final score: TekmerDB 7 — RAG 0 — Ties 2**
+
+[Read the full comparison report →](https://github.com/raa82/tekmerdb/wiki/Benchmark:-TekmerDB-vs-RAG)
 
 ---
 
