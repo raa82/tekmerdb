@@ -9,4 +9,3 @@ log/
 tests/
 docs/
 Cargo.lock
-.aider*
