@@ -1,0 +1,22 @@
+// Example job definition
+// pub struct Job {
+//     pub name: String,
+//     pub command: String,
+//     pub interval_secs: u64,
+// }
+
+// impl Job {
+//     pub fn new(name: &str, command: &str, interval_secs: u64) -> Self {
+//         Job {
+//             name: name.to_string(),
+//             command: command.to_string(),
+//             interval_secs,
+//         }
+//     }
+
+//     pub async fn run(&self) -> anyhow::Result<()> {
+//         // Execute command
+//         // ...
+//         Ok(())
+//     }
+// }
