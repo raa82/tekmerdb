@@ -9,3 +9,5 @@ log/
 tests/
 docs/
 Cargo.lock
+.aider*
+AGENTS.md
