@@ -14,20 +14,27 @@ Runs on the HOST. Requires pfodb running on :3000.
 
 Usage:
     python scripts/ingest_tekmerdb.py --pdf /path/to/WorldEnergyOutlook2025.pdf
+    python scripts/ingest_tekmerdb.py --crate <crate_name>
+    python scripts/ingest_tekmerdb.py --rust-doc <crate_name_or_url>
 """
 
 import argparse
 import os
+import pathlib
 import re
 import sys
 import time
 import requests
 import fitz
 from tqdm import tqdm
+import json
+import bs4
+import urllib.parse
+import html
 
 TEKMERDB_URL = "http://localhost:3000"
 SOURCE_NAME  = "WorldEnergyOutlook2025"  # overridden by --source-name arg
-DOMAIN       = "CriticalInfrastructure"
+DOMAIN       = "General"
 MIN_WORDS    = 8    # skip sentences shorter than this (headers, captions)
 MAX_WORDS    = 60   # split sentences longer than this
 
@@ -223,8 +230,95 @@ def load_tekmerdb(sentences: list[dict], url: str):
     print(f"\n  inserted:        {inserted}")
     print(f"  domain rejected: {domain_rejected}")
     print(f"  duplicates:      {skipped}")
-    print(f"  conflicts flagged during sweep: {conflicts}")
     print(f"  TekmerDB final PFO count: {final}")
+
+
+# =============================================================================
+# Crate mode
+# =============================================================================
+def fetch_crate_info(crate_name: str) -> dict:
+    """Fetch crate info from crates.io API."""
+    url = f"https://crates.io/api/crates/{crate_name}"
+    response = requests.get(url, headers={"User-Agent": "tekmerdb-ingest/1.0"})
+    response.raise_for_status()
+    return response.json()
+
+
+def extract_crate_sentences(crate_info: dict) -> list[dict]:
+    """Extract sentences from crate info."""
+    sentences = []
+    crate_name = crate_info.get("name", "")
+    version = crate_info.get("version", "")
+    description = crate_info.get("description", "")
+    categories = crate_info.get("categories", [])
+    keywords = crate_info.get("keywords", [])
+    license = crate_info.get("license", "")
+    dependencies = crate_info.get("dependencies", [])
+
+    # Extract sentences from description
+    if description:
+        sentences.append({
+            "sentence": f"The crate '{crate_name}' version {version} is described as: {description}",
+            "source_label": f"crates.io/{crate_name}",
+            "page_num": 1,
+        })
+
+    # Extract sentences from categories
+    for category in categories:
+        sentences.append({
+            "sentence": f"The crate '{crate_name}' belongs to the category '{category['name']}'.",
+            "source_label": f"crates.io/{crate_name}",
+            "page_num": 1,
+        })
+
+    # Extract sentences from keywords
+    for keyword in keywords:
+        sentences.append({
+            "sentence": f"The crate '{crate_name}' has the keyword '{keyword}'.",
+            "source_label": f"crates.io/{crate_name}",
+            "page_num": 1,
+        })
+
+    # Extract sentences from license
+    if license:
+        sentences.append({
+            "sentence": f"The crate '{crate_name}' is licensed under '{license}'.",
+            "source_label": f"crates.io/{crate_name}",
+            "page_num": 1,
+        })
+
+    # Extract sentences from dependencies
+    for dep in dependencies:
+        sentences.append({
+            "sentence": f"The crate '{crate_name}' depends on '{dep['name']}' version {dep['version']}.",
+            "source_label": f"crates.io/{crate_name}",
+            "page_num": 1,
+        })
+
+    return sentences
+
+
+# =============================================================================
+# Rust-doc mode
+# =============================================================================
+def fetch_rust_doc(crate_name_or_url: str) -> str:
+    """Fetch HTML pages from doc.rust-lang.org or docs.rs."""
+    if crate_name_or_url.startswith("http"):
+        url = crate_name_or_url
+    else:
+        url = f"https://docs.rs/{crate_name_or_url}/latest/"
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.text
+
+
+def extract_rust_doc_sentences(html_content: str) -> list[dict]:
+    """Extract sentences from HTML content."""
+    sentences = []
+    soup = bs4.BeautifulSoup(html_content, 'html.parser')
+    text = soup.get_text()
+    sentences = extract_sentences([{"page_num": 1, "text": text}])
+    return sentences
 
 
 # =============================================================================
@@ -235,33 +329,37 @@ def main():
     parser = argparse.ArgumentParser(
         description="Ingest PDF into TekmerDB -- sentence-level chunking"
     )
-    parser.add_argument("--pdf", required=True, help="Path to PDF file")
+    parser.add_argument("--pdf", required=False, help="Path to PDF file")
+    parser.add_argument("--crate", required=False, help="Crate name to fetch from crates.io")
+    parser.add_argument("--rust-doc", required=False, help="Crate name or URL to fetch documentation from")
     parser.add_argument("--url", default=TEKMERDB_URL, help="TekmerDB base URL")
     parser.add_argument("--source-name", default=None, help="Source name prefix (default: auto from filename)")
     args = parser.parse_args()
 
-    print("=" * 60)
-    print("  TekmerDB Ingest -- World Energy Outlook 2025")
-    print(f"  PDF    : {args.pdf}")
-    print(f"  Engine : {args.url}")
-    print(f"  Source : {SOURCE_NAME}")
-    print(f"  Mode   : sentence-level (one claim per PFO)")
-    print("=" * 60)
+    if not args.pdf and not args.crate and not args.rust_doc:
+        parser.error("At least one of --pdf, --crate, or --rust-doc must be specified")
 
-    if not os.path.exists(args.pdf):
-        print(f"\nERROR: PDF not found: {args.pdf}")
-        sys.exit(1)
-
-    if args.source_name:
-        SOURCE_NAME = args.source_name
-    else:
-        # Auto-derive from filename
-        import pathlib
+    if args.pdf:
+        if args.crate or args.rust_doc:
+            parser.error("Only one of --pdf, --crate, or --rust-doc can be specified")
         SOURCE_NAME = pathlib.Path(args.pdf).stem
+        pages = extract_pages(args.pdf)
+        sentences = extract_sentences(pages)
+        load_tekmerdb(sentences, args.url)
 
-    pages     = extract_pages(args.pdf)
-    sentences = extract_sentences(pages)
-    load_tekmerdb(sentences, args.url)
+    if args.crate:
+        if args.pdf or args.rust_doc:
+            parser.error("Only one of --pdf, --crate, or --rust-doc can be specified")
+        crate_info = fetch_crate_info(args.crate)
+        sentences = extract_crate_sentences(crate_info)
+        load_tekmerdb(sentences, args.url)
+
+    if args.rust_doc:
+        if args.pdf or args.crate:
+            parser.error("Only one of --pdf, --crate, or --rust-doc can be specified")
+        html_content = fetch_rust_doc(args.rust_doc)
+        sentences = extract_rust_doc_sentences(html_content)
+        load_tekmerdb(sentences, args.url)
 
     print("\n" + "=" * 60)
     print("  Done. Agent A (TekmerDB) is ready.")
