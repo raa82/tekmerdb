@@ -75,13 +75,15 @@ async fn system_loop(job: SystemJob, data_dir: String, log_dir: String) {
 
         tokio::spawn(async move {
             log(&log_dir_c, &job_clone.name, "started");
+            let job_name     = job_clone.name.clone();
+            let log_dir_done = log_dir_c.clone();
             tokio::task::spawn_blocking(move || {
                 run_system_job(&job_clone, &data_dir_c, &log_dir_c);
             })
             .await
             .ok();
             running_flag.store(false, Ordering::SeqCst);
-            log(&log_dir_c, &job_clone.name, "finished");
+            log(&log_dir_done, &job_name, "finished");
         });
     }
 }
