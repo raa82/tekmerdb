@@ -71,7 +71,7 @@ fn rotate_crb(crb_path: &str, parquet_path: &str) -> anyhow::Result<Option<Strin
         .ok_or_else(|| anyhow::anyhow!("expected .bin file: {}", filename))?;
 
     let counter = next_counter(dir, stem)?;
-    let dest = dir.join(format!("{}.{:05}.bin", stem, counter));
+    let dest = dir.join(format!("{}.{:06}.bin", stem, counter));
 
     std::fs::rename(crb_path, &dest)?;
 
