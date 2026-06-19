@@ -14,20 +14,15 @@ async fn main() {
     let user_jobs_path   = arg(&args, "--user-jobs").unwrap_or_else(|| "user_jobs.json".to_string());
     let log_dir          = arg(&args, "--log-dir").unwrap_or_else(|| "log".to_string());
 
+    // Fail fast if either file is unreadable or invalid JSON before entering the reload loop
+    load_json::<SystemJobsFile>(&system_jobs_path);
+    load_json::<UserJobsFile>(&user_jobs_path);
+
     println!("[cron] system-jobs={} user-jobs={} log-dir={}",
         system_jobs_path, user_jobs_path, log_dir);
+    println!("[cron] watching for config changes every 5s");
 
-    let system_file: SystemJobsFile = load_json(&system_jobs_path);
-    let user_file: UserJobsFile     = load_json(&user_jobs_path);
-
-    let enabled_system = system_file.jobs.iter().filter(|j| j.enabled).count();
-    let enabled_user   = user_file.jobs.iter().filter(|j| j.enabled).count();
-
-    println!("[cron] system jobs: {} total, {} enabled", system_file.jobs.len(), enabled_system);
-    println!("[cron] user jobs:   {} total, {} enabled", user_file.jobs.len(), enabled_user);
-    println!("[cron] scheduler starting");
-
-    scheduler::run(system_file.jobs, user_file.jobs, log_dir).await;
+    scheduler::run(system_jobs_path, user_jobs_path, log_dir).await;
 }
 
 fn load_json<T: serde::de::DeserializeOwned>(path: &str) -> T {

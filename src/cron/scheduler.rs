@@ -2,22 +2,75 @@ use chrono::Utc;
 use croner::Cron;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::SystemTime;
+use tokio::task::JoinHandle;
 use tokio::time::{sleep, Duration};
 
-use crate::config::{Job, OnFailure};
+use crate::config::{Job, OnFailure, SystemJobsFile, UserJobsFile};
 use crate::logger::log;
 
-pub async fn run(system_jobs: Vec<Job>, user_jobs: Vec<Job>, log_dir: String) {
-    let mut handles = vec![];
+pub async fn run(system_path: String, user_path: String, log_dir: String) {
+    let mut handles: Vec<JoinHandle<()>> = vec![];
+    let mut last_mtimes = (SystemTime::UNIX_EPOCH, SystemTime::UNIX_EPOCH);
 
-    for job in system_jobs.into_iter().chain(user_jobs).filter(|j| j.enabled) {
-        let log_dir = log_dir.clone();
-        handles.push(tokio::spawn(async move {
-            job_loop(job, log_dir).await;
-        }));
+    loop {
+        let mtimes = (file_mtime(&system_path), file_mtime(&user_path));
+
+        if mtimes != last_mtimes {
+            match reload(&system_path, &user_path) {
+                Ok((system_jobs, user_jobs)) => {
+                    // Parse succeeded — safe to abort old tasks and respawn
+                    for h in handles.drain(..) {
+                        h.abort();
+                    }
+
+                    let enabled_sys  = system_jobs.iter().filter(|j| j.enabled).count();
+                    let enabled_user = user_jobs.iter().filter(|j| j.enabled).count();
+                    log(&log_dir, "cron", &format!(
+                        "config reloaded — system {} ({} enabled), user {} ({} enabled)",
+                        system_jobs.len(), enabled_sys,
+                        user_jobs.len(),   enabled_user,
+                    ));
+
+                    for job in system_jobs.into_iter().chain(user_jobs).filter(|j| j.enabled) {
+                        let log_dir = log_dir.clone();
+                        handles.push(tokio::spawn(async move {
+                            job_loop(job, log_dir).await;
+                        }));
+                    }
+
+                    last_mtimes = mtimes;
+                }
+                Err(e) => {
+                    // Invalid JSON — keep existing tasks running, log and move on
+                    log(&log_dir, "cron", &format!(
+                        "config reload failed (keeping current jobs): {}", e
+                    ));
+                    last_mtimes = mtimes; // advance so we don't retry every 5s on a broken file
+                }
+            }
+        }
+
+        sleep(Duration::from_secs(5)).await;
     }
+}
 
-    futures::future::join_all(handles).await;
+fn file_mtime(path: &str) -> SystemTime {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .unwrap_or(SystemTime::UNIX_EPOCH)
+}
+
+fn reload(system_path: &str, user_path: &str) -> anyhow::Result<(Vec<Job>, Vec<Job>)> {
+    use json_comments::StripComments;
+
+    let sys_raw  = std::fs::read_to_string(system_path)?;
+    let sys_file: SystemJobsFile = serde_json::from_reader(StripComments::new(sys_raw.as_bytes()))?;
+
+    let usr_raw  = std::fs::read_to_string(user_path)?;
+    let usr_file: UserJobsFile   = serde_json::from_reader(StripComments::new(usr_raw.as_bytes()))?;
+
+    Ok((sys_file.jobs, usr_file.jobs))
 }
 
 async fn job_loop(job: Job, log_dir: String) {
