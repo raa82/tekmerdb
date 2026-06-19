@@ -2,7 +2,7 @@
   "jobs": [
     {
       "name": "test_job",
-      "enabled": true,
+      "enabled": false,
       "cron_expr": "* * * * *",
       "command": "echo \"[tekmerdb-cron] test_job ping $(date -u +%Y-%m-%dT%H:%M:%SZ)\"",
       "timeout_secs": 120,

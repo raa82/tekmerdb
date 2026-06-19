@@ -1,0 +1,41 @@
+# Build artifacts
+/target/
+**/target/
+*.rs.bk
+
+# Lockfile - exclude if you don't want Claude reading dependency pins.
+# Comment this out if you actually want dependency-version visibility.
+Cargo.lock
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs and runtime data
+*.log
+/logs/
+
+# Test fixtures / large data (adjust paths to match your actual layout)
+/fixtures/
+/test-data/
+/testdata/
+*.snap
+
+# Generated/vendored
+/vendor/
+/.cargo/registry/
+
+# Local env/secrets - never want these in context anyway
+.env
+.env.*
+*.pem
+*.key
+
+# Git internals
+.git/
