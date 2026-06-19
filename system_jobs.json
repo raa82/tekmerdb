@@ -1,32 +1,16 @@
-// system_jobs.json — Built-in maintenance jobs for tekmerdb-cron.
-//
-// These jobs ship with TekmerDB. Edit commands or schedules as needed.
-// The cron engine reads this file at startup — restart tekmerdb-cron to
-// pick up changes. Commands run as shell (sh -c) from the tekmerdb
-// working directory.
-//
-// Fields:
-//   name         — unique job identifier (string)
-//   enabled      — true to activate, false to skip without removing (bool)
-//   cron_expr    — standard 5-field cron expression
-//   command      — bash command to execute
-//   timeout_secs — seconds before the job is forcibly killed (default: 60)
-//   on_failure   — "continue" keep running other jobs (default)
-//                  "stop"     halt the cron engine immediately on error
-
 {
   "jobs": [
     {
       "name": "rotate_crb",
       "enabled": true,
       "cron_expr": "0 * * * *",
-      "command": "ts=$(date -u +%Y%m%dT%H%M%SZ); for f in data/crb.bin data/source_crb.bin; do [ -f \"$f\" ] && mv \"$f\" \"${f}.bak.${ts}\" && echo \"rotated $f\"; done",
+      "command": "ts=$(date -u +%Y%m%dT%H%M%SZ); if ./tekmerdb-maint check-crb data/crb.bin data/cold.parquet; then mv data/crb.bin \"data/crb.bin.bak.$ts\" && echo 'crb.bin rotated'; else echo 'crb.bin not ready, skipping'; fi; if ./tekmerdb-maint check-crb data/source_crb.bin data/sources.parquet; then mv data/source_crb.bin \"data/source_crb.bin.bak.$ts\" && echo 'source_crb.bin rotated'; else echo 'source_crb.bin not ready, skipping'; fi",
       "timeout_secs": 30,
       "on_failure": "continue"
     },
     {
       "name": "health_check",
-      "enabled": true,
+      "enabled": false,
       "cron_expr": "*/5 * * * *",
       "command": "ls -lh data/crb.bin data/source_crb.bin data/cold.parquet data/sources.parquet data/hnsw.index 2>&1",
       "timeout_secs": 10,

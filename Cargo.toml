@@ -36,3 +36,7 @@ path = "src/mcp/main.rs"
 [[bin]]
 name = "tekmerdb-cron"
 path = "src/cron/main.rs"
+
+[[bin]]
+name = "tekmerdb-maint"
+path = "src/maint/main.rs"
