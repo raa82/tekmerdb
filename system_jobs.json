@@ -4,7 +4,15 @@
       "name": "rotate_crb",
       "enabled": false,
       "cron_expr": "0 * * * *",
-      "command": "./tekmerdb-maint rotate-crb data/crb.bin data/cold.parquet; ./tekmerdb-maint rotate-crb data/source_crb.bin data/sources.parquet",
+      "command": "./tekmerdb-maint rotate-crb data/crb.bin data/cold.parquet",
+      "timeout_secs": 30,
+      "on_failure": "continue"
+    },
+    {
+      "name": "rotate_source_crb",
+      "enabled": false,
+      "cron_expr": "0 * * * *",
+      "command": "./tekmerdb-maint rotate-crb data/source_crb.bin data/sources.parquet",
       "timeout_secs": 30,
       "on_failure": "continue"
     },
