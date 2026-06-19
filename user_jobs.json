@@ -1,0 +1,12 @@
+{
+  "jobs": [
+    {
+      "name": "example_backup",
+      "enabled": false,
+      "cron_expr": "0 2 * * *",
+      "command": "/opt/tekmerdb/scripts/backup.sh",
+      "timeout_secs": 120,
+      "on_failure": "continue"
+    }
+  ]
+}

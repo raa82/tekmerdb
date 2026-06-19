@@ -1,9 +1,0 @@
-{
-    "jobs": [
-        {
-            "name": "rotate_crb",
-            "cron_expr": "0 * * * *", // Every hour
-            "job_fn": "rotate_crb_files"
-        }
-    ]
-}

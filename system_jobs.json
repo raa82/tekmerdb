@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "name": "rotate_crb",
+      "enabled": true,
+      "cron_expr": "0 * * * *",
+      "job_fn": "rotate_crb_files",
+      "params": {}
+    },
+    {
+      "name": "health_check",
+      "enabled": true,
+      "cron_expr": "*/5 * * * *",
+      "job_fn": "health_check",
+      "params": {}
+    },
+    {
+      "name": "archive_logs",
+      "enabled": false,
+      "cron_expr": "0 0 * * *",
+      "job_fn": "archive_logs",
+      "params": {
+        "keep_days": "7"
+      }
+    }
+  ]
+}

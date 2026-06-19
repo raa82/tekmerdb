@@ -22,6 +22,7 @@ axum = "0.7"
 reqwest = { version = "0.12", features = ["json"] }
 toml = "0.8"
 futures = "0.3"
+croner = "2"
 
 [[bin]]
 name = "tekmerdb"
@@ -30,3 +31,7 @@ path = "src/main.rs"
 [[bin]]
 name = "tekmerdb-mcp"
 path = "src/mcp/main.rs"
+
+[[bin]]
+name = "tekmerdb-cron"
+path = "src/cron/main.rs"
