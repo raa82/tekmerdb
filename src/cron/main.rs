@@ -4,6 +4,7 @@ mod logger;
 mod scheduler;
 
 use std::fs;
+use json_comments::StripComments;
 use config::{SystemJobsFile, UserJobsFile, KNOWN_JOB_FNS};
 
 #[tokio::main]
@@ -47,7 +48,8 @@ fn load_json<T: serde::de::DeserializeOwned>(path: &str) -> T {
         eprintln!("[cron] cannot read {}: {}", path, e);
         std::process::exit(1);
     });
-    serde_json::from_str(&raw).unwrap_or_else(|e| {
+    let stripped = StripComments::new(raw.as_bytes());
+    serde_json::from_reader(stripped).unwrap_or_else(|e| {
         eprintln!("[cron] invalid JSON in {}: {}", path, e);
         std::process::exit(1);
     })
