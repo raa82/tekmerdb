@@ -1,18 +1,7 @@
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct SystemJob {
-    pub name: String,
-    pub enabled: bool,
-    pub cron_expr: String,
-    pub job_fn: String,
-    #[serde(default)]
-    pub params: HashMap<String, String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct UserJob {
+pub struct Job {
     pub name: String,
     pub enabled: bool,
     pub cron_expr: String,
@@ -40,16 +29,10 @@ fn default_on_failure() -> OnFailure {
 
 #[derive(Debug, Deserialize)]
 pub struct SystemJobsFile {
-    pub jobs: Vec<SystemJob>,
+    pub jobs: Vec<Job>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UserJobsFile {
-    pub jobs: Vec<UserJob>,
+    pub jobs: Vec<Job>,
 }
-
-pub const KNOWN_JOB_FNS: &[&str] = &[
-    "rotate_crb_files",
-    "health_check",
-    "archive_logs",
-];

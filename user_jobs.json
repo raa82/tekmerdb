@@ -1,29 +1,12 @@
-// user_jobs.json — User-defined maintenance jobs for tekmerdb-cron.
-//
-// Add your own jobs to the "jobs" array below. The cron engine reads this
-// file at startup — restart tekmerdb-cron to pick up any changes.
-//
-// Fields:
-//   name         — unique job identifier (string)
-//   enabled      — true to activate, false to skip without removing (bool)
-//   cron_expr    — standard 5-field cron expression
-//                  examples: "*/5 * * * *" every 5 min, "0 2 * * *" daily at 2am
-//   command      — shell command or script path to execute
-//   timeout_secs — seconds before the job is forcibly killed (default: 60)
-//   on_failure   — "continue" keep running other jobs (default)
-//                  "stop"     halt the cron engine immediately on error
-//
-// Example job (copy, rename, and set enabled: true to activate):
-//
-// {
-//   "name": "example_backup",
-//   "enabled": false,
-//   "cron_expr": "0 2 * * *",
-//   "command": "/opt/tekmerdb/scripts/backup.sh",
-//   "timeout_secs": 120,
-//   "on_failure": "continue"
-// }
-
 {
-  "jobs": []
+  "jobs": [
+    {
+      "name": "test_job",
+      "enabled": true,
+      "cron_expr": "* * * * *",
+      "command": "echo \"[tekmerdb-cron] test_job ping $(date -u +%Y-%m-%dT%H:%M:%SZ)\"",
+      "timeout_secs": 120,
+      "on_failure": "continue"
+    }
+  ]
 }

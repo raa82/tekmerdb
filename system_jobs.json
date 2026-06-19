@@ -1,27 +1,44 @@
+// system_jobs.json — Built-in maintenance jobs for tekmerdb-cron.
+//
+// These jobs ship with TekmerDB. Edit commands or schedules as needed.
+// The cron engine reads this file at startup — restart tekmerdb-cron to
+// pick up changes. Commands run as shell (sh -c) from the tekmerdb
+// working directory.
+//
+// Fields:
+//   name         — unique job identifier (string)
+//   enabled      — true to activate, false to skip without removing (bool)
+//   cron_expr    — standard 5-field cron expression
+//   command      — bash command to execute
+//   timeout_secs — seconds before the job is forcibly killed (default: 60)
+//   on_failure   — "continue" keep running other jobs (default)
+//                  "stop"     halt the cron engine immediately on error
+
 {
   "jobs": [
     {
       "name": "rotate_crb",
       "enabled": true,
       "cron_expr": "0 * * * *",
-      "job_fn": "rotate_crb_files",
-      "params": {}
+      "command": "ts=$(date -u +%Y%m%dT%H%M%SZ); for f in data/crb.bin data/source_crb.bin; do [ -f \"$f\" ] && mv \"$f\" \"${f}.bak.${ts}\" && echo \"rotated $f\"; done",
+      "timeout_secs": 30,
+      "on_failure": "continue"
     },
     {
       "name": "health_check",
       "enabled": true,
       "cron_expr": "*/5 * * * *",
-      "job_fn": "health_check",
-      "params": {}
+      "command": "ls -lh data/crb.bin data/source_crb.bin data/cold.parquet data/sources.parquet data/hnsw.index 2>&1",
+      "timeout_secs": 10,
+      "on_failure": "continue"
     },
     {
       "name": "archive_logs",
       "enabled": false,
       "cron_expr": "0 0 * * *",
-      "job_fn": "archive_logs",
-      "params": {
-        "keep_days": "7"
-      }
+      "command": "find log/ -name '*.log' -mtime +7 -delete && echo 'old logs purged'",
+      "timeout_secs": 30,
+      "on_failure": "continue"
     }
   ]
 }
