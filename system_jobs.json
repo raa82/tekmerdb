@@ -2,9 +2,9 @@
   "jobs": [
     {
       "name": "rotate_crb",
-      "enabled": true,
+      "enabled": false,
       "cron_expr": "0 * * * *",
-      "command": "ts=$(date -u +%Y%m%dT%H%M%SZ); if ./tekmerdb-maint check-crb data/crb.bin data/cold.parquet; then mv data/crb.bin \"data/crb.bin.bak.$ts\" && echo 'crb.bin rotated'; else echo 'crb.bin not ready, skipping'; fi; if ./tekmerdb-maint check-crb data/source_crb.bin data/sources.parquet; then mv data/source_crb.bin \"data/source_crb.bin.bak.$ts\" && echo 'source_crb.bin rotated'; else echo 'source_crb.bin not ready, skipping'; fi",
+      "command": "./tekmerdb-maint rotate-crb data/crb.bin data/cold.parquet; ./tekmerdb-maint rotate-crb data/source_crb.bin data/sources.parquet",
       "timeout_secs": 30,
       "on_failure": "continue"
     },
@@ -19,7 +19,7 @@
     {
       "name": "archive_logs",
       "enabled": true,
-      "cron_expr": "0 0 * * *",
+      "cron_expr": "* * * * *",
       "command": "for f in log/server.log log/mcp-client.log; do [ -f \"$f\" ] || continue; rm -f \"${f}.7\"; for i in 6 5 4 3 2 1; do j=$((i+1)); [ -f \"${f}.${i}\" ] && mv \"${f}.${i}\" \"${f}.${j}\"; done; cp \"$f\" \"${f}.1\"; truncate -s 0 \"$f\"; echo \"rotated $f\"; done",
       "timeout_secs": 30,
       "on_failure": "continue"
