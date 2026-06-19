@@ -18,9 +18,9 @@
     },
     {
       "name": "archive_logs",
-      "enabled": false,
+      "enabled": true,
       "cron_expr": "0 0 * * *",
-      "command": "find log/ -name '*.log' -mtime +7 -delete && echo 'old logs purged'",
+      "command": "for f in log/server.log log/mcp-client.log; do [ -f \"$f\" ] || continue; rm -f \"${f}.7\"; for i in 6 5 4 3 2 1; do j=$((i+1)); [ -f \"${f}.${i}\" ] && mv \"${f}.${i}\" \"${f}.${j}\"; done; cp \"$f\" \"${f}.1\"; truncate -s 0 \"$f\"; echo \"rotated $f\"; done",
       "timeout_secs": 30,
       "on_failure": "continue"
     }
