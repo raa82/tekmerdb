@@ -4,7 +4,7 @@
       "name": "rotate_crb",
       "enabled": false,
       "cron_expr": "0 * * * *",
-      "command": "./tekmerdb-maint rotate-crb data/crb.bin data/cold.parquet",
+      "command": "if ./tekmerdb-maint check-crb data/crb.bin data/cold.parquet; then last=$(ls data/crb.[0-9]*.bin 2>/dev/null | awk -F'.' '{print $(NF-1)}' | sort -n | tail -1); next=$(printf '%06d' $((${last:-0} + 1))); mv data/crb.bin \"data/crb.${next}.bin\" && echo \"rotated to crb.${next}.bin\"; else echo \"crb.bin not ready, skipping\"; fi",
       "timeout_secs": 30,
       "on_failure": "continue"
     },
@@ -12,7 +12,7 @@
       "name": "rotate_source_crb",
       "enabled": false,
       "cron_expr": "0 * * * *",
-      "command": "./tekmerdb-maint rotate-crb data/source_crb.bin data/sources.parquet",
+      "command": "if ./tekmerdb-maint check-crb data/source_crb.bin data/sources.parquet; then last=$(ls data/source_crb.[0-9]*.bin 2>/dev/null | awk -F'.' '{print $(NF-1)}' | sort -n | tail -1); next=$(printf '%06d' $((${last:-0} + 1))); mv data/source_crb.bin \"data/source_crb.${next}.bin\" && echo \"rotated to source_crb.${next}.bin\"; else echo \"source_crb.bin not ready, skipping\"; fi",
       "timeout_secs": 30,
       "on_failure": "continue"
     },
