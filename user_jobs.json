@@ -1,6 +1,8 @@
 {
+  "_comment": "User-defined maintenance jobs for tekmerdb-cron. Add your own jobs here. The cron engine reads this file at startup — restart tekmerdb-cron to pick up changes. Fields: name (string), enabled (bool), cron_expr (standard 5-field cron), command (shell command), timeout_secs (default 60), on_failure ('continue' or 'stop').",
   "jobs": [
     {
+      "_note": "Example — copy this block, rename it, set enabled: true, and provide your command.",
       "name": "example_backup",
       "enabled": false,
       "cron_expr": "0 2 * * *",
