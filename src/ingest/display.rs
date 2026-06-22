@@ -23,21 +23,19 @@ pub fn print_header(
     domain: &str,
     domain_src: &str,
     engine: &str,
-    engine_src: &str,
-    input: &str,
     pfo_count: Option<usize>,
+    input: &str,
 ) {
+    let conn = match pfo_count {
+        Some(n) => format!("✓ connected  ({} PFOs indexed)", n),
+        None => "dry-run — connectivity not checked".to_string(),
+    };
     println!();
     println!("  TekmerDB Ingestor");
     println!("  {}", "─".repeat(52));
     println!("  Source : {}", source);
     println!("  Domain : {}  ({})", domain, domain_src);
-    let conn = match pfo_count {
-        Some(n) => format!("✓ connected  ({} PFOs indexed)", n),
-        None => "dry-run — connectivity not checked".to_string(),
-    };
     println!("  Engine : {}  {}", engine, conn);
-    println!("         ({})", engine_src);
     println!("  Input  : {}", input);
     println!();
 }

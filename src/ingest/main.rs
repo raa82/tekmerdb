@@ -1,4 +1,3 @@
-mod conf;
 mod display;
 mod pipeline;
 mod reader;
@@ -26,7 +25,7 @@ struct Args {
     #[arg(long, short = 's')]
     source: String,
 
-    /// Override domain (otherwise read from tekmerdb-server.conf)
+    /// Domain override — otherwise queried from the engine via /health
     #[arg(long, short = 'd')]
     domain: Option<String>,
 
@@ -34,13 +33,9 @@ struct Args {
     #[arg(long, default_value = "0.7")]
     confidence: f32,
 
-    /// Engine base URL (otherwise read from tekmerdb-server.conf)
-    #[arg(long, short = 'e')]
-    engine: Option<String>,
-
-    /// Explicit path to tekmerdb-server.conf
-    #[arg(long)]
-    conf: Option<String>,
+    /// Engine base URL
+    #[arg(long, short = 'e', default_value = "http://localhost:3000")]
+    engine: String,
 
     /// Force document type: pdf|docx|txt|md|url|wiki
     #[arg(long = "type")]
@@ -75,31 +70,31 @@ struct Args {
 async fn main() -> Result<()> {
     let args = Args::parse();
     let start = Instant::now();
-
-    let (engine_url, engine_src, domain, domain_src) = resolve_config(&args);
     let doc_type = reader::DocType::detect(&args.input, args.doc_type.as_deref());
 
-    // ── connectivity check (skip in dry-run) ────────────────────────────────
-    let (pfo_count, engine_domain) = if !args.dry_run {
-        match check_engine(&engine_url).await {
-            Ok(pair) => (Some(pair.0), Some(pair.1)),
+    // ── connectivity check + domain discovery (skip in dry-run) ─────────────
+    let (pfo_count, domain, domain_src) = if !args.dry_run {
+        match check_engine(&args.engine).await {
+            Ok((count, engine_domain)) => {
+                let (d, src) = if let Some(ref d) = args.domain {
+                    (d.clone(), "CLI flag".to_string())
+                } else {
+                    (engine_domain, format!("engine: {}/health", args.engine))
+                };
+                (Some(count), d, src)
+            }
             Err(e) => {
                 eprintln!(
                     "\nerror: cannot reach TekmerDB engine at {}\n  {}\n\nHint: start the engine, or pass --engine <URL> / --dry-run",
-                    engine_url, e
+                    args.engine, e
                 );
                 std::process::exit(1);
             }
         }
     } else {
-        (None, None)
-    };
-
-    // if domain was not set by CLI flag or conf, adopt what the live engine reports
-    let (domain, domain_src) = if let Some(live) = engine_domain.filter(|_| args.domain.is_none() && domain_src == "default") {
-        (live, format!("engine: {}/health", engine_url))
-    } else {
-        (domain, domain_src)
+        let d = args.domain.clone().unwrap_or_else(|| "General".to_string());
+        let src = if args.domain.is_some() { "CLI flag".to_string() } else { "default".to_string() };
+        (None, d, src)
     };
 
     // ── header ───────────────────────────────────────────────────────────────
@@ -107,10 +102,9 @@ async fn main() -> Result<()> {
         &args.source,
         &domain,
         &domain_src,
-        &engine_url,
-        &engine_src,
-        &args.input,
+        &args.engine,
         pfo_count,
+        &args.input,
     );
     if args.dry_run {
         println!("  Mode   : DRY RUN — claims will be parsed but not inserted");
@@ -153,11 +147,7 @@ async fn main() -> Result<()> {
     };
     display::finish_spinner(
         spin2,
-        &format!(
-            "[2/3] Split — {} claims  avg {} chars",
-            claims.len(),
-            avg_chars
-        ),
+        &format!("[2/3] Split — {} claims  avg {} chars", claims.len(), avg_chars),
         t0.elapsed().as_millis(),
     );
 
@@ -176,12 +166,11 @@ async fn main() -> Result<()> {
         if args.dry_run { " (dry run)" } else { "" }
     );
     let spin3 = multi.add(display::phase_spinner(&format!("{}...", ingest_label)));
-
     let progress = display::create_progress(&multi, claims.len() as u64);
 
     let (tx, mut rx) = mpsc::unbounded_channel::<PipelineEvent>();
     let cfg = pipeline::PipelineConfig {
-        engine_url: engine_url.clone(),
+        engine_url: args.engine.clone(),
         source: args.source.clone(),
         domain: domain.clone(),
         confidence: args.confidence,
@@ -191,7 +180,6 @@ async fn main() -> Result<()> {
 
     let pipeline_handle = tokio::spawn(pipeline::run(claims, cfg, tx));
 
-    // optional log file
     let mut log_writer: Option<std::io::BufWriter<std::fs::File>> = match &args.log {
         None => None,
         Some(p) => match std::fs::File::create(p) {
@@ -204,13 +192,10 @@ async fn main() -> Result<()> {
     };
 
     let mut stats = display::IngestStats::default();
-
-    // finish the "ingesting..." spinner now that progress bars are visible
     display::finish_spinner(spin3, &ingest_label, 0);
 
     while let Some(event) = rx.recv().await {
         let preview: String = event.claim().chars().take(72).collect();
-
         match &event {
             PipelineEvent::Inserted { .. } => stats.inserted += 1,
             PipelineEvent::Duplicate { .. } => stats.duplicates += 1,
@@ -219,11 +204,9 @@ async fn main() -> Result<()> {
         }
         stats.total += 1;
         stats.last_claim = preview;
-
         if let Some(ref mut w) = log_writer {
             let _ = writeln!(w, "{}", event_to_ndjson(&event));
         }
-
         display::update_progress(&progress, &stats);
     }
 
@@ -232,41 +215,7 @@ async fn main() -> Result<()> {
     progress.stats.finish_and_clear();
 
     display::print_summary(&args.source, &args.input, &stats, start.elapsed());
-
     Ok(())
-}
-
-fn resolve_config(args: &Args) -> (String, String, String, String) {
-    let loaded = conf::find_and_load(args.conf.as_deref());
-
-    let (engine_url, engine_src) = if let Some(ref url) = args.engine {
-        (url.clone(), "CLI flag".to_string())
-    } else if let Some((ref c, ref path)) = loaded {
-        if let Some(url) = c.engine_url() {
-            (url, format!("conf: {}", path))
-        } else {
-            ("http://localhost:3000".to_string(), "default".to_string())
-        }
-    } else {
-        ("http://localhost:3000".to_string(), "default".to_string())
-    };
-
-    let (domain, domain_src) = if let Some(ref d) = args.domain {
-        (d.clone(), "CLI flag".to_string())
-    } else if let Some((ref c, ref path)) = loaded {
-        if let Some(ref d) = c.domain {
-            (d.clone(), format!("conf: {}", path))
-        } else {
-            ("General".to_string(), "default".to_string())
-        }
-    } else {
-        (
-            "CriticalInfrastructure".to_string(),
-            "default".to_string(),
-        )
-    };
-
-    (engine_url, engine_src, domain, domain_src)
 }
 
 async fn check_engine(engine_url: &str) -> Result<(usize, String)> {
@@ -300,33 +249,18 @@ async fn check_engine(engine_url: &str) -> Result<(usize, String)> {
 fn event_to_ndjson(event: &PipelineEvent) -> String {
     let ts = chrono::Utc::now().to_rfc3339();
     let obj = match event {
-        PipelineEvent::Inserted {
-            pfo_id,
-            claim,
-            confidence,
-        } => serde_json::json!({
-            "ts": ts,
-            "result": "inserted",
-            "claim": claim,
-            "pfo_id": pfo_id,
-            "confidence": confidence
+        PipelineEvent::Inserted { pfo_id, claim, confidence } => serde_json::json!({
+            "ts": ts, "result": "inserted",
+            "claim": claim, "pfo_id": pfo_id, "confidence": confidence
         }),
         PipelineEvent::Duplicate { claim } => serde_json::json!({
-            "ts": ts,
-            "result": "duplicate",
-            "claim": claim
+            "ts": ts, "result": "duplicate", "claim": claim
         }),
         PipelineEvent::Rejected { claim, reason } => serde_json::json!({
-            "ts": ts,
-            "result": "rejected",
-            "claim": claim,
-            "reason": reason
+            "ts": ts, "result": "rejected", "claim": claim, "reason": reason
         }),
         PipelineEvent::Error { claim, reason } => serde_json::json!({
-            "ts": ts,
-            "result": "error",
-            "claim": claim,
-            "reason": reason
+            "ts": ts, "result": "error", "claim": claim, "reason": reason
         }),
     };
     obj.to_string()
