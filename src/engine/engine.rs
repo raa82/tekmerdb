@@ -352,6 +352,10 @@ impl Engine {
         self.hot.lock().unwrap().store.len()
     }
 
+    pub fn domain_name(&self) -> String {
+        format!("{:?}", self.config.domain)
+    }
+
     pub fn search(&mut self, query: &str, top_k: usize) -> anyhow::Result<Vec<Pfo>> {
         let fingerprint = self.fingerprinter.embed(query)?;
         let tier = self.hot.lock().unwrap();

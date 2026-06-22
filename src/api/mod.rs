@@ -73,6 +73,7 @@ pub struct SearchParams {
 pub struct HealthResponse {
     pub status: String,
     pub pfo_count: usize,
+    pub domain: String,
 }
 
 // ── source registry types ──────────────────────────────────────────────────────
@@ -138,10 +139,10 @@ fn pfo_to_response(p: &Pfo) -> PfoResponse {
 
 async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
     let engine = state.lock().unwrap();
-    let count = engine.pfo_count();
     Json(HealthResponse {
         status: "ok".to_string(),
-        pfo_count: count,
+        pfo_count: engine.pfo_count(),
+        domain: engine.domain_name(),
     })
 }
 

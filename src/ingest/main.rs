@@ -80,9 +80,9 @@ async fn main() -> Result<()> {
     let doc_type = reader::DocType::detect(&args.input, args.doc_type.as_deref());
 
     // ── connectivity check (skip in dry-run) ────────────────────────────────
-    let pfo_count = if !args.dry_run {
+    let (pfo_count, engine_domain) = if !args.dry_run {
         match check_engine(&engine_url).await {
-            Ok(n) => Some(n),
+            Ok(pair) => (Some(pair.0), Some(pair.1)),
             Err(e) => {
                 eprintln!(
                     "\nerror: cannot reach TekmerDB engine at {}\n  {}\n\nHint: start the engine, or pass --engine <URL> / --dry-run",
@@ -92,7 +92,14 @@ async fn main() -> Result<()> {
             }
         }
     } else {
-        None
+        (None, None)
+    };
+
+    // if domain was not set by CLI flag or conf, adopt what the live engine reports
+    let (domain, domain_src) = if let Some(live) = engine_domain.filter(|_| args.domain.is_none() && domain_src == "default") {
+        (live, format!("engine: {}/health", engine_url))
+    } else {
+        (domain, domain_src)
     };
 
     // ── header ───────────────────────────────────────────────────────────────
@@ -250,10 +257,7 @@ fn resolve_config(args: &Args) -> (String, String, String, String) {
         if let Some(ref d) = c.domain {
             (d.clone(), format!("conf: {}", path))
         } else {
-            (
-                "CriticalInfrastructure".to_string(),
-                "default".to_string(),
-            )
+            ("General".to_string(), "default".to_string())
         }
     } else {
         (
@@ -265,12 +269,13 @@ fn resolve_config(args: &Args) -> (String, String, String, String) {
     (engine_url, engine_src, domain, domain_src)
 }
 
-async fn check_engine(engine_url: &str) -> Result<usize> {
+async fn check_engine(engine_url: &str) -> Result<(usize, String)> {
     #[derive(serde::Deserialize)]
     struct HealthResponse {
         #[allow(dead_code)]
         status: String,
         pfo_count: usize,
+        domain: String,
     }
 
     let client = reqwest::Client::builder()
@@ -289,7 +294,7 @@ async fn check_engine(engine_url: &str) -> Result<usize> {
         .await
         .context("engine /health returned an unexpected response")?;
 
-    Ok(health.pfo_count)
+    Ok((health.pfo_count, health.domain))
 }
 
 fn event_to_ndjson(event: &PipelineEvent) -> String {
