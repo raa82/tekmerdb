@@ -24,6 +24,13 @@ toml = "0.8"
 futures = "0.3"
 croner = "2"
 json_comments = "0.2"
+clap = { version = "4", features = ["derive"] }
+pdf-extract = "0.7"
+zip = "2"
+quick-xml = "0.36"
+pulldown-cmark = "0.12"
+scraper = "0.21"
+indicatif = "0.17"
 
 [[bin]]
 name = "tekmerdb"
@@ -36,3 +43,7 @@ path = "src/mcp/main.rs"
 [[bin]]
 name = "tekmerdb-cron"
 path = "src/cron/main.rs"
+
+[[bin]]
+name = "tekmerdb-ingest"
+path = "src/ingest/main.rs"
