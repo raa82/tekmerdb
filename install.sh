@@ -85,11 +85,12 @@ info "Extracting binaries..."
 tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
 
 # find extracted binaries — handle both flat and subdirectory extraction
-TEKMERDB_BIN=$(find "$TMP_DIR" -name "tekmerdb" -not -name "tekmerdb-mcp" -not -name "tekmerdb-ingest" -type f | head -1)
+TEKMERDB_BIN=$(find "$TMP_DIR" -name "tekmerdb" -not -name "tekmerdb-mcp" -not -name "tekmerdb-ingest" -not -name "tekmerdb-cron" -type f | head -1)
 TEKMERDB_MCP_BIN=$(find "$TMP_DIR" -name "tekmerdb-mcp" -type f | head -1)
+TEKMERDB_CRON_BIN=$(find "$TMP_DIR" -name "tekmerdb-cron" -type f | head -1)
 TEKMERDB_INGEST_BIN=$(find "$TMP_DIR" -name "tekmerdb-ingest" -type f | head -1)
 
-if [ -z "$TEKMERDB_BIN" ] || [ -z "$TEKMERDB_MCP_BIN" ] || [ -z "$TEKMERDB_INGEST_BIN" ]; then
+if [ -z "$TEKMERDB_BIN" ] || [ -z "$TEKMERDB_MCP_BIN" ] || [ -z "$TEKMERDB_CRON_BIN" ] || [ -z "$TEKMERDB_INGEST_BIN" ]; then
     error "Binaries not found in release tarball."
 fi
 
@@ -105,9 +106,11 @@ mkdir -p "$INSTALL_DIR/log"
 info "Installing binaries..."
 cp "$TEKMERDB_BIN"        "$INSTALL_DIR/tekmerdb"
 cp "$TEKMERDB_MCP_BIN"    "$INSTALL_DIR/tekmerdb-mcp"
+cp "$TEKMERDB_CRON_BIN"   "$INSTALL_DIR/tekmerdb-cron"
 cp "$TEKMERDB_INGEST_BIN" "$INSTALL_DIR/tekmerdb-ingest"
 chmod +x "$INSTALL_DIR/tekmerdb"
 chmod +x "$INSTALL_DIR/tekmerdb-mcp"
+chmod +x "$INSTALL_DIR/tekmerdb-cron"
 chmod +x "$INSTALL_DIR/tekmerdb-ingest"
 
 rm -rf "$TMP_DIR"
@@ -184,11 +187,72 @@ download_model \
 REAL_USER="${SUDO_USER:-$USER}"
 chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data" "$INSTALL_DIR/log" 2>/dev/null || true
 
+# ── systemd services ──────────────────────────────────────────────────────────
+
+info "Installing systemd service units..."
+
+cat > /etc/systemd/system/tekmerdb-server.service <<EOF
+[Unit]
+Description=TekmerDB Engine
+After=network.target
+
+[Service]
+Type=simple
+User=$REAL_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/tekmerdb
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/tekmerdb-mcp.service <<EOF
+[Unit]
+Description=TekmerDB MCP Server
+After=tekmerdb-server.service
+Requires=tekmerdb-server.service
+
+[Service]
+Type=simple
+User=$REAL_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/tekmerdb-mcp --sse
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/tekmerdb-cron.service <<EOF
+[Unit]
+Description=TekmerDB Cron Scheduler
+After=tekmerdb-server.service
+Requires=tekmerdb-server.service
+
+[Service]
+Type=simple
+User=$REAL_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/tekmerdb-cron
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable tekmerdb-server tekmerdb-mcp tekmerdb-cron
+info "Services enabled (not started — run: systemctl start tekmerdb-server tekmerdb-mcp tekmerdb-cron)"
+
 # ── verify ────────────────────────────────────────────────────────────────────
 
 info "Verifying installation..."
 MISSING=0
-for f in tekmerdb tekmerdb-mcp tekmerdb-ingest tekmerdb-server.conf \
+for f in tekmerdb tekmerdb-mcp tekmerdb-cron tekmerdb-ingest tekmerdb-server.conf \
           system_jobs.json user_jobs.json \
           models/miniLM.onnx models/tokenizer.json \
           models/nli.onnx models/nli_tokenizer.json; do
@@ -210,6 +274,7 @@ echo ""
 echo "  Location  : $INSTALL_DIR"
 echo "  Engine    : $INSTALL_DIR/tekmerdb"
 echo "  MCP       : $INSTALL_DIR/tekmerdb-mcp"
+echo "  Cron      : $INSTALL_DIR/tekmerdb-cron"
 echo "  Ingestor  : $INSTALL_DIR/tekmerdb-ingest"
 echo "  Config    : $INSTALL_DIR/tekmerdb-server.conf"
 echo "  Jobs      : $INSTALL_DIR/system_jobs.json / user_jobs.json"
@@ -217,10 +282,10 @@ echo "  Models    : $INSTALL_DIR/models/"
 echo "  Data      : $INSTALL_DIR/data/"
 echo "  Logs      : $INSTALL_DIR/log/"
 echo ""
-echo "  Start the engine:"
-echo "    cd $INSTALL_DIR && ./tekmerdb"
+echo "  Start all services:"
+echo "    systemctl start tekmerdb-server tekmerdb-mcp tekmerdb-cron"
 echo ""
 echo "  Configure:"
 echo "    edit $INSTALL_DIR/tekmerdb-server.conf"
-echo "    restart the engine to apply changes"
+echo "    systemctl restart tekmerdb-server"
 echo ""
