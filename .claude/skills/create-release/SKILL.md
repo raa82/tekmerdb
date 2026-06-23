@@ -149,7 +149,7 @@ git add Cargo.toml
 git commit -m "Bump version to {VERSION}
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-git tag "v{VERSION}"
+git tag "{VERSION}"
 ```
 
 ---
@@ -158,7 +158,7 @@ git tag "v{VERSION}"
 
 ```bash
 git push origin main
-git push origin "v{VERSION}"
+git push origin "{VERSION}"
 ```
 
 If push fails, stop and tell the user to push manually, then upload the tarball at `/tmp/{TARBALL}`.
@@ -181,8 +181,8 @@ RESPONSE=$(curl -s -X POST \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   https://api.github.com/repos/raa82/tekmerdb/releases \
   -d "{
-    \"tag_name\": \"v{VERSION}\",
-    \"name\": \"v{VERSION}\",
+    \"tag_name\": \"{VERSION}\",
+    \"name\": \"TekmerDB {VERSION}\",
     \"body\": ${BODY},
     \"draft\": false,
     \"prerelease\": false
@@ -218,8 +218,9 @@ rm "/tmp/${TARBALL}"
 Print:
 
 ```
-Released : v{VERSION}
-URL      : https://github.com/raa82/tekmerdb/releases/tag/v{VERSION}
+Released : TekmerDB {VERSION}
+Tag      : {VERSION}
+URL      : https://github.com/raa82/tekmerdb/releases/tag/{VERSION}
 Asset    : {TARBALL}
 Binaries : tekmerdb  tekmerdb-mcp  tekmerdb-cron  tekmerdb-ingest
 ```
