@@ -1,6 +1,7 @@
 ---
 name: create-release
 description: Bump version, build all binaries, package tarball, write changelog from git history, tag, push, and publish a GitHub release. Use when the user wants to cut a new release of tekmerdb.
+user-invocable: true
 tools: Bash, Read, Edit
 ---
 
