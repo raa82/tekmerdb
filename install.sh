@@ -85,10 +85,11 @@ info "Extracting binaries..."
 tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
 
 # find extracted binaries — handle both flat and subdirectory extraction
-TEKMERDB_BIN=$(find "$TMP_DIR" -name "tekmerdb" -not -name "tekmerdb-mcp" -type f | head -1)
+TEKMERDB_BIN=$(find "$TMP_DIR" -name "tekmerdb" -not -name "tekmerdb-mcp" -not -name "tekmerdb-ingest" -type f | head -1)
 TEKMERDB_MCP_BIN=$(find "$TMP_DIR" -name "tekmerdb-mcp" -type f | head -1)
+TEKMERDB_INGEST_BIN=$(find "$TMP_DIR" -name "tekmerdb-ingest" -type f | head -1)
 
-if [ -z "$TEKMERDB_BIN" ] || [ -z "$TEKMERDB_MCP_BIN" ]; then
+if [ -z "$TEKMERDB_BIN" ] || [ -z "$TEKMERDB_MCP_BIN" ] || [ -z "$TEKMERDB_INGEST_BIN" ]; then
     error "Binaries not found in release tarball."
 fi
 
@@ -102,10 +103,12 @@ mkdir -p "$INSTALL_DIR/log"
 # ── install binaries ──────────────────────────────────────────────────────────
 
 info "Installing binaries..."
-cp "$TEKMERDB_BIN"     "$INSTALL_DIR/tekmerdb"
-cp "$TEKMERDB_MCP_BIN" "$INSTALL_DIR/tekmerdb-mcp"
+cp "$TEKMERDB_BIN"        "$INSTALL_DIR/tekmerdb"
+cp "$TEKMERDB_MCP_BIN"    "$INSTALL_DIR/tekmerdb-mcp"
+cp "$TEKMERDB_INGEST_BIN" "$INSTALL_DIR/tekmerdb-ingest"
 chmod +x "$INSTALL_DIR/tekmerdb"
 chmod +x "$INSTALL_DIR/tekmerdb-mcp"
+chmod +x "$INSTALL_DIR/tekmerdb-ingest"
 
 rm -rf "$TMP_DIR"
 
@@ -118,6 +121,18 @@ if [ -f "$INSTALL_DIR/tekmerdb-server.conf" ]; then
 else
     cp "$SCRIPT_DIR/tekmerdb-server.conf" "$INSTALL_DIR/tekmerdb-server.conf"
     info "Config file installed."
+fi
+
+cp "$SCRIPT_DIR/system_jobs.json" "$INSTALL_DIR/system_jobs.json"
+info "system_jobs.json installed."
+
+if [ -f "$INSTALL_DIR/user_jobs.json" ]; then
+    warn "user_jobs.json already exists — preserving your jobs."
+    warn "New default saved as $INSTALL_DIR/user_jobs.json.new"
+    cp "$SCRIPT_DIR/user_jobs.json" "$INSTALL_DIR/user_jobs.json.new"
+else
+    cp "$SCRIPT_DIR/user_jobs.json" "$INSTALL_DIR/user_jobs.json"
+    info "user_jobs.json installed."
 fi
 
 # ── download models ───────────────────────────────────────────────────────────
@@ -173,7 +188,8 @@ chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data" "$INSTALL_DIR/log" 2>/dev/n
 
 info "Verifying installation..."
 MISSING=0
-for f in tekmerdb tekmerdb-mcp tekmerdb-server.conf \
+for f in tekmerdb tekmerdb-mcp tekmerdb-ingest tekmerdb-server.conf \
+          system_jobs.json user_jobs.json \
           models/miniLM.onnx models/tokenizer.json \
           models/nli.onnx models/nli_tokenizer.json; do
     if [ ! -f "$INSTALL_DIR/$f" ]; then
@@ -191,13 +207,15 @@ fi
 echo ""
 info "TekmerDB $TAG installed successfully."
 echo ""
-echo "  Location : $INSTALL_DIR"
-echo "  Engine   : $INSTALL_DIR/tekmerdb"
-echo "  MCP      : $INSTALL_DIR/tekmerdb-mcp"
-echo "  Config   : $INSTALL_DIR/tekmerdb-server.conf"
-echo "  Models   : $INSTALL_DIR/models/"
-echo "  Data     : $INSTALL_DIR/data/"
-echo "  Logs     : $INSTALL_DIR/log/"
+echo "  Location  : $INSTALL_DIR"
+echo "  Engine    : $INSTALL_DIR/tekmerdb"
+echo "  MCP       : $INSTALL_DIR/tekmerdb-mcp"
+echo "  Ingestor  : $INSTALL_DIR/tekmerdb-ingest"
+echo "  Config    : $INSTALL_DIR/tekmerdb-server.conf"
+echo "  Jobs      : $INSTALL_DIR/system_jobs.json / user_jobs.json"
+echo "  Models    : $INSTALL_DIR/models/"
+echo "  Data      : $INSTALL_DIR/data/"
+echo "  Logs      : $INSTALL_DIR/log/"
 echo ""
 echo "  Start the engine:"
 echo "    cd $INSTALL_DIR && ./tekmerdb"
