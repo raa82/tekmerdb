@@ -10,3 +10,4 @@ tests/
 docs/
 Cargo.lock
 tkdb-assistant/
+.claude/
