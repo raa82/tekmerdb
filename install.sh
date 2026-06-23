@@ -47,6 +47,15 @@ if [ ! -f "$SCRIPT_DIR/Cargo.toml" ] || [ ! -f "$SCRIPT_DIR/tekmerdb-server.conf
     error "Run this script from the root of the tekmerdb repository."
 fi
 
+# ── create system user ────────────────────────────────────────────────────────
+
+if ! id -u tekmerdb &>/dev/null; then
+    useradd --system --no-create-home --shell /sbin/nologin tekmerdb
+    info "Created system user: tekmerdb"
+else
+    info "System user tekmerdb already exists."
+fi
+
 # ── read version from Cargo.toml ──────────────────────────────────────────────
 
 VERSION=$(grep '^version' "$SCRIPT_DIR/Cargo.toml" | head -1 | sed -E 's/version = "(.*)"/\1/' | tr -d ' ')
@@ -184,8 +193,7 @@ download_model \
 
 # ── permissions ───────────────────────────────────────────────────────────────
 
-REAL_USER="${SUDO_USER:-$USER}"
-chown -R "$REAL_USER:$REAL_USER" "$INSTALL_DIR/data" "$INSTALL_DIR/log" 2>/dev/null || true
+chown -R tekmerdb:tekmerdb "$INSTALL_DIR"
 
 # ── systemd services ──────────────────────────────────────────────────────────
 
@@ -198,7 +206,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=$REAL_USER
+User=tekmerdb
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/tekmerdb
 Restart=on-failure
@@ -216,7 +224,7 @@ Requires=tekmerdb-server.service
 
 [Service]
 Type=simple
-User=$REAL_USER
+User=tekmerdb
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/tekmerdb-mcp --sse
 Restart=on-failure
@@ -234,7 +242,7 @@ Requires=tekmerdb-server.service
 
 [Service]
 Type=simple
-User=$REAL_USER
+User=tekmerdb
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/tekmerdb-cron
 Restart=on-failure
