@@ -70,8 +70,9 @@ pub struct SearchParams {
 }
 
 #[derive(Serialize)]
-pub struct HealthResponse {
+pub struct StatusResponse {
     pub status: String,
+    pub version: String,
     pub pfo_count: usize,
     pub domain: String,
 }
@@ -137,10 +138,11 @@ fn pfo_to_response(p: &Pfo) -> PfoResponse {
 
 // ── existing handlers (unchanged logic) ───────────────────────────────────────
 
-async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
+async fn status(State(state): State<AppState>) -> Json<StatusResponse> {
     let engine = state.lock().unwrap();
-    Json(HealthResponse {
+    Json(StatusResponse {
         status: "ok".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
         pfo_count: engine.pfo_count(),
         domain: engine.domain_name(),
     })
@@ -330,7 +332,7 @@ async fn get_source(
 
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/health",              get(health))
+        .route("/status",              get(status))
         .route("/pfo",                 post(insert_pfo))
         .route("/pfo/:id",             get(get_pfo))
         .route("/pfo/:id/confidence",  patch(update_confidence))

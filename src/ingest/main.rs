@@ -25,7 +25,7 @@ struct Args {
     #[arg(long, short = 's')]
     source: String,
 
-    /// Domain override — otherwise queried from the engine via /health
+    /// Domain override — otherwise queried from the engine via /status
     #[arg(long, short = 'd')]
     domain: Option<String>,
 
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
                 let (d, src) = if let Some(ref d) = args.domain {
                     (d.clone(), "CLI flag".to_string())
                 } else {
-                    (engine_domain, format!("engine: {}/health", args.engine))
+                    (engine_domain, format!("engine: {}/status", args.engine))
                 };
                 (Some(count), d, src)
             }
@@ -220,9 +220,11 @@ async fn main() -> Result<()> {
 
 async fn check_engine(engine_url: &str) -> Result<(usize, String)> {
     #[derive(serde::Deserialize)]
-    struct HealthResponse {
+    struct StatusResponse {
         #[allow(dead_code)]
         status: String,
+        #[allow(dead_code)]
+        version: String,
         pfo_count: usize,
         domain: String,
     }
@@ -231,17 +233,17 @@ async fn check_engine(engine_url: &str) -> Result<(usize, String)> {
         .timeout(std::time::Duration::from_secs(10))
         .build()?;
 
-    let url = format!("{}/health", engine_url);
+    let url = format!("{}/status", engine_url);
     let resp = client
         .get(&url)
         .send()
         .await
         .with_context(|| format!("cannot connect to {}", url))?;
 
-    let health: HealthResponse = resp
+    let health: StatusResponse = resp
         .json()
         .await
-        .context("engine /health returned an unexpected response")?;
+        .context("engine /status returned an unexpected response")?;
 
     Ok((health.pfo_count, health.domain))
 }
