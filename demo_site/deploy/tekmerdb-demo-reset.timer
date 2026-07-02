@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly TekmerDB demo reset (single shared instance for all visitors)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

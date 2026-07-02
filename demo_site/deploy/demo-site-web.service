@@ -1,0 +1,21 @@
+[Unit]
+Description=TekmerDB demo site (Flask backend)
+# After= only, deliberately no Requires=: the hourly reset stops/restarts
+# tekmerdb-server, and Requires= would cascade that stop into this unit too
+# (confirmed by hitting this exact bug — it silently took the site down).
+After=network.target tekmerdb-server.service
+
+[Service]
+Type=simple
+User=demo-site
+Group=demo-site
+WorkingDirectory=/opt/demo-site
+Environment=TEKMERDB_ENGINE_URL=http://127.0.0.1:3000
+Environment=TEKMERDB_INGEST_BIN=/opt/tekmerdb/tekmerdb-ingest
+Environment=TEKMERDB_DEMO_SCRATCH=/opt/demo-site/scratch
+ExecStart=/opt/demo-site/venv/bin/gunicorn --workers 1 --threads 4 --bind 127.0.0.1:8090 --timeout 60 app:app
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

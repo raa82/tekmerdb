@@ -1,0 +1,15 @@
+[Unit]
+Description=Wipe TekmerDB demo data and restart
+# Deliberately no Requires=/After=tekmerdb-server.service here: this unit's own
+# job is to stop that service, and Requires= would make systemd treat that as
+# the dependency going down and kill this unit's own process mid-run.
+
+[Service]
+Type=oneshot
+# ExecStart is not run through a shell, so a `data/*` glob is never expanded —
+# it would be passed to rm literally and silently no-op (confirmed by hitting
+# this exact bug). Remove the whole dir instead; the engine recreates it with
+# correct ownership via fs::create_dir_all() on next start.
+ExecStart=/bin/systemctl stop tekmerdb-server
+ExecStart=/bin/rm -rf /opt/tekmerdb/data
+ExecStart=/bin/systemctl start tekmerdb-server

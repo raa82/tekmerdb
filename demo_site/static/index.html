@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TekmerDB Demo</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>TekmerDB Demo</h1>
+    <p>Upload a small PDF or paste text and TekmerDB will extract claims and score confidence mechanically &mdash; not guessed by an LLM. When two claims conflict, both are flagged, not silently resolved.</p>
+    <p class="notice">This is a single shared public demo instance &mdash; all data is wiped every hour.</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="pdf">Upload PDF</button>
+    <button class="tab-btn" data-tab="text">Paste text</button>
+    <button class="tab-btn" data-tab="claim">Insert a claim</button>
+  </nav>
+
+  <section id="tab-pdf" class="tab-panel active">
+    <form id="pdf-form">
+      <label>PDF file (max 2MB)
+        <input type="file" name="pdf" accept=".pdf" required>
+      </label>
+      <button type="submit">Ingest PDF</button>
+    </form>
+  </section>
+
+  <section id="tab-text" class="tab-panel">
+    <form id="text-form">
+      <label>Paste text to split into claims
+        <textarea name="text" rows="6" maxlength="20000" required placeholder="Paste a paragraph or two of factual text..."></textarea>
+      </label>
+      <button type="submit">Ingest text</button>
+    </form>
+  </section>
+
+  <section id="tab-claim" class="tab-panel">
+    <p class="hint">Try the contradiction demo: insert "Drug X approved by FDA" from source <code>FDA-2024</code>, then insert "Drug X rejected by FDA due to safety concerns" from source <code>FDA-2025-review</code> &mdash; watch both drop in confidence and flag a conflict.</p>
+    <form id="claim-form">
+      <label>Claim text
+        <input type="text" name="claim_text" maxlength="2000" required placeholder="Drug X approved by FDA">
+      </label>
+      <label>Confidence (0.0 &ndash; 1.0)
+        <input type="number" name="confidence" min="0" max="1" step="0.01" value="0.8" required>
+      </label>
+      <label>Source name
+        <input type="text" name="source" maxlength="200" required placeholder="FDA-2024">
+      </label>
+      <button type="submit">Insert claim</button>
+    </form>
+  </section>
+
+  <section id="results"></section>
+
+  <script src="/app.js"></script>
+</body>
+</html>

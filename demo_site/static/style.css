@@ -1,0 +1,52 @@
+:root { color-scheme: light dark; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  max-width: 680px;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+  line-height: 1.5;
+}
+h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.notice {
+  display: inline-block;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  background: #eab30822;
+  color: #b45309;
+}
+.tabs { display: flex; gap: 0.5rem; margin: 1.5rem 0 1rem; border-bottom: 1px solid #80808044; }
+.tab-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 0.6rem 0.9rem; font-size: 0.95rem; color: inherit; opacity: 0.6;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn.active { opacity: 1; border-bottom-color: #2563eb; font-weight: 600; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+form { display: flex; flex-direction: column; gap: 0.9rem; margin: 1rem 0; }
+label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
+input, textarea {
+  font: inherit; padding: 0.5rem 0.6rem; border-radius: 6px;
+  border: 1px solid #80808066; background: transparent; color: inherit;
+}
+button {
+  align-self: flex-start; font: inherit; font-weight: 600; cursor: pointer;
+  padding: 0.55rem 1.1rem; border-radius: 6px; border: none;
+  background: #2563eb; color: white;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+.hint { font-size: 0.85rem; opacity: 0.8; }
+code { background: #80808022; padding: 0.1rem 0.35rem; border-radius: 4px; }
+#results { margin-top: 2rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.card {
+  border: 1px solid #80808044; border-radius: 8px; padding: 0.8rem 1rem;
+  display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem;
+}
+.card .claim { font-weight: 600; }
+.card .meta { display: flex; gap: 0.6rem; flex-wrap: wrap; font-size: 0.8rem; opacity: 0.85; }
+.badge { padding: 0.15rem 0.5rem; border-radius: 5px; font-weight: 600; }
+.badge.conflict { background: #dc262622; color: #dc2626; }
+.badge.corroborated { background: #16a34a22; color: #16a34a; }
+.badge.rejected, .badge.error { background: #80808022; color: #6b7280; }
+.error-msg { color: #dc2626; font-size: 0.9rem; }
