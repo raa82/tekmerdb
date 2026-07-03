@@ -202,13 +202,11 @@ document.getElementById("search-form").addEventListener("submit", async (e) => {
   setBusy(form, false);
 });
 
-document.getElementById("source-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const name = form.name.value.trim();
-  setBusy(form, true);
-  await runQueryJob(`source --name "${name}"`, `/api/demo/source?name=${encodeURIComponent(name)}`);
-  setBusy(form, false);
+document.getElementById("sources-btn").addEventListener("click", async (e) => {
+  const btn = e.target;
+  btn.disabled = true;
+  await runQueryJob("sources --all", "/api/demo/sources");
+  btn.disabled = false;
 });
 
 document.getElementById("claim-form").addEventListener("submit", async (e) => {

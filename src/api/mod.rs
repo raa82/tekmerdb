@@ -328,6 +328,21 @@ async fn get_source(
     }
 }
 
+async fn list_sources(State(state): State<AppState>) -> Json<Vec<SourceResponse>> {
+    let engine = state.lock().unwrap();
+    let sources = engine.all_sources()
+        .into_iter()
+        .map(|(name, source)| SourceResponse {
+            source_id: source.source_id,
+            name,
+            effective_weight: source.effective_weight,
+            corroboration_count: source.corroboration_count,
+            conflict_trigger_count: source.conflict_trigger_count,
+        })
+        .collect();
+    Json(sources)
+}
+
 // ── router ─────────────────────────────────────────────────────────────────────
 
 pub fn router(state: AppState) -> Router {
@@ -338,6 +353,7 @@ pub fn router(state: AppState) -> Router {
         .route("/pfo/:id/confidence",  patch(update_confidence))
         .route("/search",              get(search_pfos))
         .route("/source",              post(register_source).get(get_source_by_name))
+        .route("/source/all",          get(list_sources))
         .route("/source/:id",          get(get_source))
         .with_state(state)
 }

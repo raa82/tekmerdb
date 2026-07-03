@@ -57,10 +57,8 @@ def index():
 
 @app.get("/api/demo/status")
 def demo_status():
-    # The deployed engine release predates the /status rename (see project notes) —
-    # it still answers on /health. This proxy hides that detail from the frontend.
     try:
-        resp = requests.get(f"{ENGINE_URL}/health", timeout=5)
+        resp = requests.get(f"{ENGINE_URL}/status", timeout=5)
         resp.raise_for_status()
         data = resp.json()
     except requests.RequestException:
@@ -231,22 +229,16 @@ def search():
     return jsonify(resp.json())
 
 
-@app.get("/api/demo/source")
+@app.get("/api/demo/sources")
 @limiter.limit("30 per hour")
-def source():
-    name = (request.args.get("name") or "").strip()
-    if not name or len(name) > MAX_SOURCE_CHARS:
-        return error(f"name is required (max {MAX_SOURCE_CHARS} characters)")
-
+def sources():
     try:
-        resp = requests.get(f"{ENGINE_URL}/source", params={"name": name}, timeout=15)
+        resp = requests.get(f"{ENGINE_URL}/source/all", timeout=15)
     except requests.RequestException:
         return error("demo engine is unreachable (may be mid-reset, try again shortly)", 503)
 
-    if resp.status_code == 404:
-        return error(f'no source named "{name}"', 404)
     if not resp.ok:
-        return error("source lookup failed", 502)
+        return error("failed to fetch sources", 502)
 
     return jsonify(resp.json())
 

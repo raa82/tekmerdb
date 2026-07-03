@@ -348,6 +348,14 @@ impl Engine {
         reg.get_by_id(id).map(|s| (name, s.clone()))
     }
 
+    pub fn all_sources(&self) -> Vec<(String, crate::engine::pfo::Source)> {
+        self.source_registry.lock().unwrap()
+            .get_all_records()
+            .into_iter()
+            .map(|r| (r.name, r.source))
+            .collect()
+    }
+
     pub fn pfo_count(&self) -> usize {
         self.hot.lock().unwrap().store.len()
     }
