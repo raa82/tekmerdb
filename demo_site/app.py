@@ -213,6 +213,24 @@ def insert():
     return jsonify(_render_pfo(pfo, status="inserted"))
 
 
+@app.get("/api/demo/search")
+@limiter.limit("30 per hour")
+def search():
+    q = (request.args.get("q") or "").strip()
+    if not q or len(q) > MAX_CLAIM_CHARS:
+        return error(f"q is required (max {MAX_CLAIM_CHARS} characters)")
+
+    try:
+        resp = requests.get(f"{ENGINE_URL}/search", params={"q": q}, timeout=15)
+    except requests.RequestException:
+        return error("demo engine is unreachable (may be mid-reset, try again shortly)", 503)
+
+    if not resp.ok:
+        return error("search failed", 502)
+
+    return jsonify(resp.json())
+
+
 def _fetch_pfo(pfo_id):
     if not pfo_id:
         return None

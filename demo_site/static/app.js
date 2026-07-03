@@ -152,6 +152,56 @@ document.getElementById("text-form").addEventListener("submit", async (e) => {
   setBusy(form, false);
 });
 
+function renderJsonValue(value, indent) {
+  const pad = "  ".repeat(indent);
+  const padInner = "  ".repeat(indent + 1);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const items = value.map((v) => padInner + renderJsonValue(v, indent + 1)).join(",\n");
+    return `[\n${items}\n${pad}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const keys = Object.keys(value);
+    if (keys.length === 0) return "{}";
+    const items = keys
+      .map((k) => {
+        const keyHtml = `<span class="json-key">${escapeHtml(JSON.stringify(k))}</span>`;
+        return `${padInner}${keyHtml}: ${renderJsonValue(value[k], indent + 1)}`;
+      })
+      .join(",\n");
+    return `{\n${items}\n${pad}}`;
+  }
+  return `<span class="json-val">${escapeHtml(JSON.stringify(value))}</span>`;
+}
+
+async function runSearchJob(cmd, url) {
+  printPrompt(cmd);
+  const pending = printPending("... searching");
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!resp.ok) {
+      pending.outerHTML = `<div class="out error">!! ${escapeHtml(data.error || "something went wrong")}</div>`;
+      scrollToBottom();
+      return;
+    }
+    pending.outerHTML = `<pre class="json-output">${renderJsonValue(data, 0)}</pre>`;
+    scrollToBottom();
+  } catch (e) {
+    pending.outerHTML = `<div class="out error">!! network error &mdash; try again</div>`;
+    scrollToBottom();
+  }
+}
+
+document.getElementById("search-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const q = form.q.value.trim();
+  setBusy(form, true);
+  await runSearchJob(`search "${q}"`, `/api/demo/search?q=${encodeURIComponent(q)}`);
+  setBusy(form, false);
+});
+
 document.getElementById("claim-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;

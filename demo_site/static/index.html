@@ -11,13 +11,14 @@
   <header>
     <h1>TekmerDB Demo</h1>
     <p>Upload a small PDF or paste text and TekmerDB will extract claims and score confidence mechanically &mdash; not guessed by an LLM. When two claims conflict, both are flagged, not silently resolved.</p>
-    <p class="notice">This is a single shared public demo instance &mdash; all data is wiped every hour.</p>
   </header>
 
   <section class="sysinfo" aria-label="system info">
     <div class="sysinfo-item"><span class="k">domain</span><span class="v" id="sys-domain">&hellip;</span></div>
     <div class="sysinfo-item"><span class="k">pfos</span><span class="v" id="sys-pfos">&hellip;</span></div>
     <div class="sysinfo-item"><span class="k">last reset</span><span class="v" id="sys-reset">&hellip;</span></div>
+    <div class="sysinfo-note">public shared dataset</div>
+    <div class="sysinfo-note">data wiped every hour</div>
   </section>
 
   <main class="layout">
@@ -77,8 +78,13 @@
 
       <div class="side-tab-panel" id="side-tab-retrieve">
         <section class="panel">
-          <h2>Retrieve data</h2>
-          <p class="hint">Coming soon.</p>
+          <h2>Search PFOs</h2>
+          <form id="search-form">
+            <label>Query string
+              <input type="text" name="q" maxlength="2000" required placeholder="diabetes">
+            </label>
+            <button type="submit">Search</button>
+          </form>
         </section>
       </div>
     </aside>

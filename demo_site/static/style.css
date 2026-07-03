@@ -52,6 +52,14 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5rem; }
 .sysinfo-item { display: flex; gap: 0.5rem; align-items: baseline; }
 .sysinfo-item .k { text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .sysinfo-item .v { font-weight: 600; }
+.sysinfo-note {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 0.15rem 0.5rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
 
 .layout {
   display: grid;
@@ -90,6 +98,16 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5rem; }
 .console .out.rejected { color: var(--muted); }
 .console .out.error { color: var(--danger); }
 .console .tag { font-weight: 600; }
+.console pre.json-output {
+  margin: 0;
+  padding-left: 1.4rem;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre;
+  overflow-x: auto;
+}
+.console .json-key { color: inherit; }
+.console .json-val { color: #f2cc8f; }
 
 /* --- right-hand action panels --- */
 .panel-stack { display: flex; flex-direction: column; gap: 1rem; }
