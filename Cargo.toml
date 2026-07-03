@@ -26,6 +26,7 @@ croner = "2"
 json_comments = "0.2"
 clap = { version = "4", features = ["derive"] }
 pdf-extract = "0.7"
+euclid = "0.20"
 zip = "2"
 quick-xml = "0.36"
 pulldown-cmark = "0.12"
