@@ -174,9 +174,9 @@ function renderJsonValue(value, indent) {
   return `<span class="json-val">${escapeHtml(JSON.stringify(value))}</span>`;
 }
 
-async function runSearchJob(cmd, url) {
+async function runQueryJob(cmd, url) {
   printPrompt(cmd);
-  const pending = printPending("... searching");
+  const pending = printPending("... fetching");
   try {
     const resp = await fetch(url);
     const data = await resp.json();
@@ -198,7 +198,16 @@ document.getElementById("search-form").addEventListener("submit", async (e) => {
   const form = e.target;
   const q = form.q.value.trim();
   setBusy(form, true);
-  await runSearchJob(`search "${q}"`, `/api/demo/search?q=${encodeURIComponent(q)}`);
+  await runQueryJob(`search "${q}"`, `/api/demo/search?q=${encodeURIComponent(q)}`);
+  setBusy(form, false);
+});
+
+document.getElementById("source-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const name = form.name.value.trim();
+  setBusy(form, true);
+  await runQueryJob(`source --name "${name}"`, `/api/demo/source?name=${encodeURIComponent(name)}`);
   setBusy(form, false);
 });
 

@@ -231,6 +231,26 @@ def search():
     return jsonify(resp.json())
 
 
+@app.get("/api/demo/source")
+@limiter.limit("30 per hour")
+def source():
+    name = (request.args.get("name") or "").strip()
+    if not name or len(name) > MAX_SOURCE_CHARS:
+        return error(f"name is required (max {MAX_SOURCE_CHARS} characters)")
+
+    try:
+        resp = requests.get(f"{ENGINE_URL}/source", params={"name": name}, timeout=15)
+    except requests.RequestException:
+        return error("demo engine is unreachable (may be mid-reset, try again shortly)", 503)
+
+    if resp.status_code == 404:
+        return error(f'no source named "{name}"', 404)
+    if not resp.ok:
+        return error("source lookup failed", 502)
+
+    return jsonify(resp.json())
+
+
 def _fetch_pfo(pfo_id):
     if not pfo_id:
         return None
