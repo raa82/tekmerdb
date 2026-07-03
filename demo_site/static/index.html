@@ -7,53 +7,83 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+ <div class="container">
   <header>
     <h1>TekmerDB Demo</h1>
     <p>Upload a small PDF or paste text and TekmerDB will extract claims and score confidence mechanically &mdash; not guessed by an LLM. When two claims conflict, both are flagged, not silently resolved.</p>
     <p class="notice">This is a single shared public demo instance &mdash; all data is wiped every hour.</p>
   </header>
 
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="pdf">Upload PDF</button>
-    <button class="tab-btn" data-tab="text">Paste text</button>
-    <button class="tab-btn" data-tab="claim">Insert a claim</button>
-  </nav>
-
-  <section id="tab-pdf" class="tab-panel active">
-    <form id="pdf-form">
-      <label>PDF file (max 2MB)
-        <input type="file" name="pdf" accept=".pdf" required>
-      </label>
-      <button type="submit">Ingest PDF</button>
-    </form>
+  <section class="sysinfo" aria-label="system info">
+    <div class="sysinfo-item"><span class="k">domain</span><span class="v" id="sys-domain">&hellip;</span></div>
+    <div class="sysinfo-item"><span class="k">pfos</span><span class="v" id="sys-pfos">&hellip;</span></div>
+    <div class="sysinfo-item"><span class="k">last reset</span><span class="v" id="sys-reset">&hellip;</span></div>
   </section>
 
-  <section id="tab-text" class="tab-panel">
-    <form id="text-form">
-      <label>Paste text to split into claims
-        <textarea name="text" rows="6" maxlength="20000" required placeholder="Paste a paragraph or two of factual text..."></textarea>
-      </label>
-      <button type="submit">Ingest text</button>
-    </form>
-  </section>
+  <main class="layout">
+    <section class="console" aria-label="output">
+      <div class="console-inner" id="console">
+        <div class="line boot">tekmerdb demo console &mdash; ready. submit an action on the right.</div>
+      </div>
+    </section>
 
-  <section id="tab-claim" class="tab-panel">
-    <p class="hint">Try the contradiction demo: insert "Drug X approved by FDA" from source <code>FDA-2024</code>, then insert "Drug X rejected by FDA due to safety concerns" from source <code>FDA-2025-review</code> &mdash; watch both drop in confidence and flag a conflict.</p>
-    <form id="claim-form">
-      <label>Claim text
-        <input type="text" name="claim_text" maxlength="2000" required placeholder="Drug X approved by FDA">
-      </label>
-      <label>Confidence (0.0 &ndash; 1.0)
-        <input type="number" name="confidence" min="0" max="1" step="0.01" value="0.8" required>
-      </label>
-      <label>Source name
-        <input type="text" name="source" maxlength="200" required placeholder="FDA-2024">
-      </label>
-      <button type="submit">Insert claim</button>
-    </form>
-  </section>
+    <aside class="panel-stack">
+      <nav class="side-tabs">
+        <button class="side-tab-btn active" data-side-tab="insert">Insert data</button>
+        <button class="side-tab-btn" data-side-tab="retrieve">Retrieve data</button>
+      </nav>
 
-  <section id="results"></section>
+      <div class="side-tab-panel active" id="side-tab-insert">
+        <section class="panel" id="panel-pdf">
+          <h2>Upload PDF</h2>
+          <form id="pdf-form">
+            <label>PDF file (max 2MB)
+              <input type="file" name="pdf" accept=".pdf" required>
+            </label>
+            <button type="submit">Ingest PDF</button>
+          </form>
+        </section>
+
+        <section class="panel" id="panel-text">
+          <h2>Paste text</h2>
+          <form id="text-form">
+            <label>Source name (optional)
+              <input type="text" name="source" maxlength="200" placeholder="e.g. my-report-2024">
+            </label>
+            <label>Text to split into claims
+              <textarea name="text" rows="5" maxlength="20000" required placeholder="Paste a paragraph or two of factual text..."></textarea>
+            </label>
+            <button type="submit">Ingest text</button>
+          </form>
+        </section>
+
+        <section class="panel" id="panel-claim">
+          <h2>Insert a claim</h2>
+          <p class="hint">Try the contradiction demo: insert "Drug X approved by FDA" from source <code>FDA-2024</code>, then "Drug X rejected by FDA due to safety concerns" from source <code>FDA-2025-review</code>.</p>
+          <form id="claim-form">
+            <label>Claim text
+              <input type="text" name="claim_text" maxlength="2000" required placeholder="Drug X approved by FDA">
+            </label>
+            <label>Confidence (0.0 &ndash; 1.0)
+              <input type="number" name="confidence" min="0" max="1" step="0.01" value="0.8" required>
+            </label>
+            <label>Source name
+              <input type="text" name="source" maxlength="200" required placeholder="FDA-2024">
+            </label>
+            <button type="submit">Insert claim</button>
+          </form>
+        </section>
+      </div>
+
+      <div class="side-tab-panel" id="side-tab-retrieve">
+        <section class="panel">
+          <h2>Retrieve data</h2>
+          <p class="hint">Coming soon.</p>
+        </section>
+      </div>
+    </aside>
+  </main>
+ </div>
 
   <script src="/app.js"></script>
 </body>

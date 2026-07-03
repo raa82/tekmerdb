@@ -1,55 +1,50 @@
-const tabButtons = document.querySelectorAll(".tab-btn");
-const tabPanels = document.querySelectorAll(".tab-panel");
-tabButtons.forEach((btn) => {
+document.querySelectorAll(".side-tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    tabButtons.forEach((b) => b.classList.remove("active"));
-    tabPanels.forEach((p) => p.classList.remove("active"));
+    document.querySelectorAll(".side-tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".side-tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    document.getElementById(`side-tab-${btn.dataset.sideTab}`).classList.add("active");
   });
 });
 
-const resultsEl = document.getElementById("results");
+const consoleEl = document.getElementById("console");
+const sysDomainEl = document.getElementById("sys-domain");
+const sysPfosEl = document.getElementById("sys-pfos");
+const sysResetEl = document.getElementById("sys-reset");
 
-function setBusy(form, busy) {
-  form.querySelector("button").disabled = busy;
+function relativeTime(epochSeconds) {
+  const diff = Math.max(0, Date.now() / 1000 - epochSeconds);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function renderError(message) {
-  resultsEl.innerHTML = `<p class="error-msg">${escapeHtml(message)}</p>`;
+async function refreshStatus() {
+  try {
+    const resp = await fetch("/api/demo/status");
+    const data = await resp.json();
+    if (!resp.ok) {
+      sysDomainEl.textContent = "unreachable";
+      sysPfosEl.textContent = "—";
+      sysResetEl.textContent = "—";
+      return;
+    }
+    sysDomainEl.textContent = data.domain || "—";
+    sysPfosEl.textContent = typeof data.pfo_count === "number" ? data.pfo_count : "—";
+    if (typeof data.last_reset === "number") {
+      sysResetEl.textContent = relativeTime(data.last_reset);
+      sysResetEl.title = new Date(data.last_reset * 1000).toLocaleString();
+    } else {
+      sysResetEl.textContent = "—";
+    }
+  } catch (e) {
+    sysDomainEl.textContent = "unreachable";
+  }
 }
 
-function renderClaims(claims) {
-  if (!claims || claims.length === 0) {
-    resultsEl.innerHTML = `<p class="hint">No claims were extracted.</p>`;
-    return;
-  }
-  resultsEl.innerHTML = claims.map(renderCard).join("");
-}
-
-function renderCard(c) {
-  const pct = typeof c.confidence === "number" ? Math.round(c.confidence * 100) : null;
-  const badges = [];
-  if (c.status && c.status !== "inserted") {
-    badges.push(`<span class="badge ${c.status}">${escapeHtml(c.status)}</span>`);
-  }
-  if (c.conflict_count) {
-    badges.push(`<span class="badge conflict">&#9888; conflict detected (${c.conflict_count})</span>`);
-  }
-  if (c.corroboration_count) {
-    badges.push(`<span class="badge corroborated">corroborated &times;${c.corroboration_count}</span>`);
-  }
-  return `
-    <div class="card">
-      <div class="claim">${escapeHtml(c.claim_text || "")}</div>
-      <div class="meta">
-        ${pct !== null ? `<span>confidence: ${pct}%</span>` : ""}
-        ${c.source ? `<span>source: ${escapeHtml(c.source)}</span>` : ""}
-        ${c.reason ? `<span>${escapeHtml(c.reason)}</span>` : ""}
-        ${badges.join(" ")}
-      </div>
-    </div>`;
-}
+refreshStatus();
+setInterval(refreshStatus, 20000);
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (m) => ({
@@ -57,62 +52,122 @@ function escapeHtml(s) {
   }[m]));
 }
 
-async function submitForm(form, buildRequest, extractClaims) {
-  setBusy(form, true);
-  resultsEl.innerHTML = `<p class="hint">Working&hellip; (embedding + conflict detection takes a few seconds)</p>`;
+function scrollToBottom() {
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function printPrompt(cmd) {
+  const el = document.createElement("div");
+  el.className = "line";
+  el.innerHTML = `<span class="prompt">$</span> ${escapeHtml(cmd)}`;
+  consoleEl.appendChild(el);
+  scrollToBottom();
+}
+
+function printPending(text) {
+  const el = document.createElement("div");
+  el.className = "line pending";
+  el.textContent = text;
+  consoleEl.appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+function claimLineHtml(c) {
+  const pct = typeof c.confidence === "number" ? `${Math.round(c.confidence * 100)}%` : null;
+  const tags = [];
+  if (c.status && c.status !== "inserted") tags.push(`[${c.status}]`);
+  if (c.conflict_count) tags.push(`[conflict x${c.conflict_count}]`);
+  if (c.corroboration_count) tags.push(`[corroborated x${c.corroboration_count}]`);
+
+  let cls = "out";
+  if (c.conflict_count) cls += " conflict";
+  else if (c.corroboration_count) cls += " corroborated";
+  else if (c.status && c.status !== "inserted") cls += " rejected";
+
+  const parts = [];
+  if (pct) parts.push(`<span class="pct">[${pct}]</span>`);
+  parts.push(escapeHtml(c.claim_text || ""));
+  if (c.reason) parts.push(`&mdash; ${escapeHtml(c.reason)}`);
+  if (tags.length) parts.push(`<span class="tag">${escapeHtml(tags.join(" "))}</span>`);
+
+  return `<div class="${cls}">${parts.join(" ")}</div>`;
+}
+
+function renderClaims(claims) {
+  if (!claims || claims.length === 0) {
+    return `<div class="out">no claims were extracted.</div>`;
+  }
+  return claims.map(claimLineHtml).join("");
+}
+
+async function runJob(cmd, request) {
+  printPrompt(cmd);
+  const pending = printPending("... working (embedding + conflict detection takes a few seconds)");
   try {
-    const { url, options } = buildRequest(form);
-    const resp = await fetch(url, options);
+    const resp = await fetch(request.url, request.options);
     const data = await resp.json();
     if (!resp.ok) {
-      renderError(data.error || "something went wrong");
+      pending.outerHTML = `<div class="out error">!! ${escapeHtml(data.error || "something went wrong")}</div>`;
+      scrollToBottom();
       return;
     }
-    renderClaims(extractClaims(data));
+    const claims = request.extractClaims(data);
+    pending.outerHTML = renderClaims(claims);
+    scrollToBottom();
+    refreshStatus();
   } catch (e) {
-    renderError("network error — try again");
-  } finally {
-    setBusy(form, false);
+    pending.outerHTML = `<div class="out error">!! network error &mdash; try again</div>`;
+    scrollToBottom();
   }
 }
 
-document.getElementById("pdf-form").addEventListener("submit", (e) => {
+function setBusy(form, busy) {
+  form.querySelector("button").disabled = busy;
+}
+
+document.getElementById("pdf-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  submitForm(
-    e.target,
-    (form) => ({ url: "/api/demo/upload", options: { method: "POST", body: new FormData(form) } }),
-    (data) => data.claims
-  );
+  const form = e.target;
+  const filename = form.pdf.files[0] ? form.pdf.files[0].name : "(no file)";
+  setBusy(form, true);
+  await runJob(`ingest --pdf ${filename}`, {
+    url: "/api/demo/upload",
+    options: { method: "POST", body: new FormData(form) },
+    extractClaims: (data) => data.claims,
+  });
+  setBusy(form, false);
 });
 
-document.getElementById("text-form").addEventListener("submit", (e) => {
+document.getElementById("text-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  submitForm(
-    e.target,
-    (form) => ({ url: "/api/demo/upload", options: { method: "POST", body: new FormData(form) } }),
-    (data) => data.claims
-  );
+  const form = e.target;
+  const source = form.source.value.trim();
+  setBusy(form, true);
+  await runJob(`ingest --text${source ? ` --source ${source}` : ""}`, {
+    url: "/api/demo/upload",
+    options: { method: "POST", body: new FormData(form) },
+    extractClaims: (data) => data.claims,
+  });
+  setBusy(form, false);
 });
 
-document.getElementById("claim-form").addEventListener("submit", (e) => {
+document.getElementById("claim-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  submitForm(
-    e.target,
-    (form) => {
-      const fd = new FormData(form);
-      return {
-        url: "/api/demo/insert",
-        options: {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            claim_text: fd.get("claim_text"),
-            confidence: parseFloat(fd.get("confidence")),
-            source: fd.get("source"),
-          }),
-        },
-      };
+  const form = e.target;
+  const fd = new FormData(form);
+  const claimText = fd.get("claim_text");
+  const confidence = parseFloat(fd.get("confidence"));
+  const source = fd.get("source");
+  setBusy(form, true);
+  await runJob(`insert --source ${source} --confidence ${confidence} "${claimText}"`, {
+    url: "/api/demo/insert",
+    options: {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claim_text: claimText, confidence, source }),
     },
-    (data) => [data]
-  );
+    extractClaims: (data) => [data],
+  });
+  setBusy(form, false);
 });

@@ -25,6 +25,7 @@ from flask_limiter.util import get_remote_address
 ENGINE_URL = os.environ.get("TEKMERDB_ENGINE_URL", "http://127.0.0.1:3000")
 INGEST_BIN = os.environ.get("TEKMERDB_INGEST_BIN", "/opt/tekmerdb/tekmerdb-ingest")
 SCRATCH_DIR = os.environ.get("TEKMERDB_DEMO_SCRATCH", "/tmp/tekmerdb-demo")
+DATA_DIR = os.environ.get("TEKMERDB_DATA_DIR", "/opt/tekmerdb/data")
 MAX_PDF_BYTES = 2 * 1024 * 1024  # 2MB
 MAX_TEXT_CHARS = 20_000
 MAX_CLAIM_CHARS = 2_000
@@ -61,9 +62,24 @@ def demo_status():
     try:
         resp = requests.get(f"{ENGINE_URL}/health", timeout=5)
         resp.raise_for_status()
-        return jsonify(resp.json())
+        data = resp.json()
     except requests.RequestException:
         return error("demo engine is unreachable (may be mid-reset, try again shortly)", 503)
+
+    # The engine has no uptime/reset-time concept of its own. But the hourly
+    # reset timer recreates this directory from scratch on every engine start
+    # (rm -rf + fs::create_dir_all), so its mtime IS the last reset time.
+    try:
+        last_reset = os.path.getmtime(DATA_DIR)
+    except OSError:
+        last_reset = None
+
+    return jsonify({
+        "status": data.get("status"),
+        "domain": data.get("domain"),
+        "pfo_count": data.get("pfo_count"),
+        "last_reset": last_reset,
+    })
 
 
 @app.post("/api/demo/upload")
@@ -71,6 +87,7 @@ def demo_status():
 def upload():
     pdf_file = request.files.get("pdf")
     text = (request.form.get("text") or "").strip()
+    custom_source = (request.form.get("source") or "").strip()
 
     if pdf_file and text:
         return error("submit either a PDF or pasted text, not both")
@@ -78,9 +95,11 @@ def upload():
         return error("submit a PDF file or some pasted text")
     if text and len(text) > MAX_TEXT_CHARS:
         return error(f"pasted text too long (max {MAX_TEXT_CHARS} characters)")
+    if custom_source and len(custom_source) > MAX_SOURCE_CHARS:
+        return error(f"source name too long (max {MAX_SOURCE_CHARS} characters)")
 
     job_id = uuid.uuid4().hex[:12]
-    source_name = f"demo-{job_id}"
+    source_name = custom_source or f"demo-{job_id}"
 
     if pdf_file:
         if not pdf_file.filename.lower().endswith(".pdf"):
