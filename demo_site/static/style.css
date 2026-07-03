@@ -155,6 +155,7 @@ button {
 }
 button:disabled { opacity: 0.5; cursor: default; }
 .hint { font-size: 0.8rem; opacity: 0.8; margin: 0; }
+.hint-list { font-size: 0.8rem; opacity: 0.8; margin: 0; padding-left: 1.2rem; }
 code { background: color-mix(in srgb, var(--muted) 25%, transparent); padding: 0.1rem 0.35rem; border-radius: 4px; }
 .code-block {
   background: color-mix(in srgb, var(--muted) 25%, transparent);
