@@ -32,6 +32,7 @@
       <nav class="side-tabs">
         <button class="side-tab-btn active" data-side-tab="insert">Insert data</button>
         <button class="side-tab-btn" data-side-tab="retrieve">Retrieve data</button>
+        <button class="side-tab-btn" data-side-tab="mcp">Connect via MCP</button>
       </nav>
 
       <div class="side-tab-panel active" id="side-tab-insert">
@@ -92,6 +93,16 @@
           <h2>Sources</h2>
           <p class="hint">A source is whoever submitted a claim (a PDF upload, pasted text, or a manual insert) &mdash; each gets tracked with an effective weight that rises with corroboration and falls when it triggers a conflict.</p>
           <button type="button" id="sources-btn">Search</button>
+        </section>
+      </div>
+
+      <div class="side-tab-panel" id="side-tab-mcp">
+        <section class="panel">
+          <h2>Connect via MCP</h2>
+          <p class="hint">Point any MCP client (SSE transport) at this shared demo engine:</p>
+          <pre class="code-block">http://tekmerdb.com:3001/sse</pre>
+          <p class="hint">Tools available: <code>insert_pfo</code>, <code>search</code>, <code>get_pfo</code>, <code>get_source</code>, <code>register_source</code>, <code>update_confidence</code>.</p>
+          <p class="hint">No auth, no rate limit &mdash; same single shared instance as the rest of this demo, wiped hourly.</p>
         </section>
       </div>
     </aside>

@@ -220,7 +220,9 @@ cat > /etc/systemd/system/tekmerdb-mcp.service <<EOF
 [Unit]
 Description=TekmerDB MCP Server
 After=tekmerdb-server.service
-Requires=tekmerdb-server.service
+# Deliberately no Requires=: it only cascades a stop, never a restart — an
+# operator restarting tekmerdb-server (e.g. a scheduled data reset) would take
+# this unit down with it and it would not come back up on its own.
 
 [Service]
 Type=simple
@@ -238,7 +240,9 @@ cat > /etc/systemd/system/tekmerdb-cron.service <<EOF
 [Unit]
 Description=TekmerDB Cron Scheduler
 After=tekmerdb-server.service
-Requires=tekmerdb-server.service
+# Deliberately no Requires=: it only cascades a stop, never a restart — an
+# operator restarting tekmerdb-server (e.g. a scheduled data reset) would take
+# this unit down with it and it would not come back up on its own.
 
 [Service]
 Type=simple
