@@ -1,3 +1,30 @@
+// TODO: fetch this from a backend endpoint (mirrors the engine's Domain enum,
+// src/engine/pfo.rs) once domain selection is wired up to actually launch a
+// scoped instance. Hardcoded here only because the launch button is
+// frontend-only for now.
+const DOMAINS = [
+  "Healthcare", "LawEnforcement", "CriticalInfrastructure", "Employment",
+  "Education", "Migration", "LegalInterpretation", "Finance", "General",
+];
+
+function humanizeDomain(name) {
+  return name.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+const domainSelect = document.getElementById("domain-select");
+DOMAINS.forEach((d) => {
+  const opt = document.createElement("option");
+  opt.value = d;
+  opt.textContent = humanizeDomain(d);
+  domainSelect.appendChild(opt);
+});
+
+document.getElementById("launch-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  document.getElementById("launch-screen").hidden = true;
+  document.getElementById("app-screen").hidden = false;
+});
+
 document.querySelectorAll(".side-tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".side-tab-btn").forEach((b) => b.classList.remove("active"));

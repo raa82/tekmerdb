@@ -38,6 +38,26 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5rem; }
   color: var(--accent);
 }
 
+.launch-screen {
+  max-width: 640px;
+  margin: 10vh auto 0;
+  text-align: left;
+}
+.launch-screen h1 { text-align: center; }
+.launch-screen p { opacity: 0.85; font-size: 0.95rem; }
+.launch-screen form {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+.launch-screen label { flex: 1; }
+.launch-screen select {
+  font: inherit; padding: 0.5rem 0.6rem; border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--muted) 70%, transparent);
+  background: var(--console-bg); color: inherit; width: 100%;
+}
+
 .sysinfo {
   display: flex;
   flex-wrap: wrap;

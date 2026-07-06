@@ -8,6 +8,18 @@
 </head>
 <body>
  <div class="container">
+  <section class="launch-screen" id="launch-screen">
+    <h1>TekmerDB Demo</h1>
+    <p>TekmerDB is a <strong>domain-scoped</strong> engine &mdash; it has to be told upfront which EU AI Act risk category it's operating in. Every claim is checked against a similarity gate for that domain, and claims that drift outside it get rejected; this keeps confidence scoring meaningful and specific to the regulatory context, instead of one fuzzy pool of unrelated facts. Pick a domain below to launch an instance scoped to it.</p>
+    <form id="launch-form">
+      <label>Domain
+        <select name="domain" id="domain-select" required></select>
+      </label>
+      <button type="submit">Launch TekmerDB</button>
+    </form>
+  </section>
+
+  <div class="app-screen" id="app-screen" hidden>
   <header>
     <h1>TekmerDB Demo</h1>
     <p>Upload a small PDF or paste text and TekmerDB will extract claims and score confidence mechanically &mdash; not guessed by an LLM. When two claims conflict, both are flagged, not silently resolved.</p>
@@ -112,6 +124,7 @@
       </div>
     </aside>
   </main>
+  </div>
  </div>
 
   <script src="/app.js"></script>
