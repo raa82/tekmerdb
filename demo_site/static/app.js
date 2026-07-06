@@ -81,7 +81,7 @@ function updateMcpEndpoint(port) {
   if (port) mcpEndpointEl.textContent = `http://tekmerdb.com:${port}/sse`;
 }
 
-function enterAppScreen(domain, mcpPort) {
+function enterAppScreen(domain, mcpPort, containerName) {
   clearInterval(prepMsgTimer);
   clearTimeout(launchPollTimer);
   currentDomain = domain;
@@ -90,6 +90,7 @@ function enterAppScreen(domain, mcpPort) {
   launchScreen.hidden = true;
   appScreen.hidden = false;
   updateMcpEndpoint(mcpPort);
+  if (containerName) sysContainerEl.textContent = containerName;
   refreshStatus();
 }
 
@@ -98,7 +99,7 @@ async function pollLaunchStatus(domain) {
     const resp = await fetch(`/api/demo/launch/status?domain=${encodeURIComponent(domain)}`);
     const data = await resp.json();
     if (data.state === "ready") {
-      enterAppScreen(domain, data.mcp_port);
+      enterAppScreen(domain, data.mcp_port, data.name);
       return;
     }
     if (data.state === "gone") {
@@ -132,7 +133,7 @@ document.getElementById("launch-form").addEventListener("submit", async (e) => {
       return;
     }
     if (data.state === "ready") {
-      enterAppScreen(domain, data.mcp_port);
+      enterAppScreen(domain, data.mcp_port, data.name);
     } else {
       pollLaunchStatus(domain);
     }
@@ -145,6 +146,7 @@ document.getElementById("launch-form").addEventListener("submit", async (e) => {
 
 const consoleEl = document.getElementById("console");
 const sysDomainEl = document.getElementById("sys-domain");
+const sysContainerEl = document.getElementById("sys-container");
 const sysPfosEl = document.getElementById("sys-pfos");
 const sysTtlEl = document.getElementById("sys-ttl");
 
@@ -168,11 +170,13 @@ async function refreshStatus() {
     }
     if (!resp.ok) {
       sysDomainEl.textContent = "unreachable";
+      sysContainerEl.textContent = "—";
       sysPfosEl.textContent = "—";
       sysTtlEl.textContent = "—";
       return;
     }
     sysDomainEl.textContent = data.domain || "—";
+    sysContainerEl.textContent = data.name || "—";
     sysPfosEl.textContent = typeof data.pfo_count === "number" ? data.pfo_count : "—";
     if (typeof data.ttl_remaining === "number") {
       ttlDeadline = Date.now() + data.ttl_remaining * 1000;

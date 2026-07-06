@@ -181,6 +181,7 @@ def find_or_launch(domain):
         if existing:
             return {
                 "domain": existing["domain"],
+                "name": existing["name"],
                 "state": "ready" if existing["health"] == "healthy" else "launching",
                 "mcp_port": existing["mcp_port"],
                 "ttl_remaining": max(0, int(CONTAINER_TTL_SECS - existing["age"])),
@@ -203,6 +204,7 @@ def find_or_launch(domain):
 
         return {
             "domain": domain,
+            "name": f"{CONTAINER_PREFIX}{domain.lower()}",
             "state": "launching",
             "mcp_port": mcp_port,
             "ttl_remaining": CONTAINER_TTL_SECS,
@@ -246,6 +248,7 @@ def launch_status():
 
     return jsonify({
         "domain": c["domain"],
+        "name": c["name"],
         "state": "ready" if c["health"] == "healthy" else "launching",
         "mcp_port": c["mcp_port"],
         "ttl_remaining": max(0, int(CONTAINER_TTL_SECS - c["age"])),
@@ -273,6 +276,7 @@ def demo_status():
     return jsonify({
         "status": data.get("status"),
         "domain": data.get("domain"),
+        "name": c["name"],
         "pfo_count": data.get("pfo_count"),
         "ttl_remaining": max(0, int(CONTAINER_TTL_SECS - c["age"])),
         "mcp_port": c["mcp_port"],
