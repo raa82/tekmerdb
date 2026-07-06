@@ -11,13 +11,16 @@ use axum::{
     Router,
     routing::get,
     response::sse::{Event, Sse},
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     Json,
 };
+use std::collections::HashMap;
 use std::convert::Infallible;
-use std::sync::Arc;
-use futures::stream::{self, Stream};
+use std::sync::{Arc, Mutex};
+use futures::stream::{self, Stream, StreamExt};
+use tokio::sync::mpsc;
+use uuid::Uuid;
 
 const ENGINE_URL: &str = "http://localhost:3000";
 
@@ -309,15 +312,35 @@ pub async fn run_stdio() {
 }
 
 // ── SSE transport ──────────────────────────────────────────────────────────────
+//
+// MCP's SSE transport is two endpoints working together, not one:
+//   GET  /sse      — long-lived stream. First event tells the client where to
+//                    POST (`endpoint`); after that, every JSON-RPC response
+//                    for this client arrives here as a `message` event.
+//   POST /message  — the client posts requests here. The reply is *not* the
+//                    POST's response body — it's delivered over that client's
+//                    own open /sse stream instead, which is why the endpoint
+//                    URI carries a per-connection sessionId: it's how
+//                    /message knows which open stream to push the reply onto.
+//
+// (The previous version returned the reply directly as the POST's body and
+// closed the /sse stream after its single `endpoint` event -- so any
+// spec-compliant client opened /sse and sat waiting forever for a reply that
+// could never arrive there. Confirmed via a raw protocol trace: `curl /sse`
+// showed the stream ending immediately, and `curl -X POST /message` returned
+// the full JSON-RPC result directly instead of a bare 202.)
 
-// SSE state — shared client and broadcast channel for responses
+type SessionMap = Mutex<HashMap<String, mpsc::UnboundedSender<Event>>>;
+
 struct SseState {
     client: reqwest::Client,
+    sessions: SessionMap,
 }
 
 pub async fn run_sse(host: String, port: u16) {
     let state = Arc::new(SseState {
         client: reqwest::Client::new(),
+        sessions: Mutex::new(HashMap::new()),
     });
 
     let app = Router::new()
@@ -337,35 +360,61 @@ pub async fn run_sse(host: String, port: u16) {
         .expect("SSE server error");
 }
 
-// GET /sse — agent connects here to receive server-sent events
+// GET /sse — agent connects here; the stream stays open for the session's
+// lifetime, delivering this client's JSON-RPC responses as they're ready.
 async fn sse_handler(
-    State(_state): State<Arc<SseState>>,
+    State(state): State<Arc<SseState>>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    mcp_log_info!("[tekmerdb-mcp] SSE client connected");
+    let session_id = Uuid::new_v4().to_string();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Event>();
+    state.sessions.lock().unwrap().insert(session_id.clone(), tx);
 
-    // send initial endpoint event so agent knows where to POST messages
-    let stream = stream::once(async {
+    mcp_log_info!("[tekmerdb-mcp] SSE client connected — session {}", session_id);
+
+    let endpoint = stream::once(async move {
         Ok(Event::default()
             .event("endpoint")
-            .data("/message"))
+            .data(format!("/message?sessionId={}", session_id)))
     });
+    let messages = stream::poll_fn(move |cx| rx.poll_recv(cx).map(|opt| opt.map(Ok)));
 
-    Sse::new(stream)
+    Sse::new(endpoint.chain(messages)).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
-// POST /message — agent posts JSON-RPC messages here
+#[derive(Debug, Deserialize)]
+struct MessageQuery {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+}
+
+// POST /message — agent posts JSON-RPC requests here. The reply is delivered
+// asynchronously over that session's open /sse stream, not this response —
+// this just acks receipt.
 async fn message_handler(
     State(state): State<Arc<SseState>>,
+    Query(q): Query<MessageQuery>,
     Json(req): Json<RpcRequest>,
-) -> Result<Json<RpcResponse>, StatusCode> {
-    mcp_log_info!("[tekmerdb-mcp] SSE message received: {}", req.method);
+) -> StatusCode {
+    mcp_log_info!("[tekmerdb-mcp] SSE message received: {} (session {})", req.method, q.session_id);
 
     if req.method.starts_with("notifications/") {
         mcp_log_info!("[tekmerdb-mcp] notification: {}", req.method);
-        return Ok(Json(RpcResponse::ok(Value::Null, json!({}))));
+        return StatusCode::ACCEPTED;
     }
 
     let resp = handle_request(&state.client, req).await;
     mcp_log_info!("[tekmerdb-mcp] SSE response: {}", serde_json::to_string(&resp).unwrap_or_default());
-    Ok(Json(resp))
+
+    let event = Event::default()
+        .event("message")
+        .data(serde_json::to_string(&resp).unwrap_or_default());
+
+    let mut sessions = state.sessions.lock().unwrap();
+    let delivered = sessions.get(&q.session_id).is_some_and(|tx| tx.send(event).is_ok());
+    if !delivered {
+        mcp_log_error!("[tekmerdb-mcp] session {} gone — dropping response", q.session_id);
+        sessions.remove(&q.session_id);
+    }
+
+    StatusCode::ACCEPTED
 }
