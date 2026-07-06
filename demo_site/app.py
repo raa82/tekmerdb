@@ -51,12 +51,16 @@ MAX_SOURCE_CHARS = 200
 INGEST_TIMEOUT_SECS = 45
 
 CONTAINER_PREFIX = "tekmerdb-"
+CONTAINER_LABEL = "tekmerdb.demo=1"
 CONTAINER_TTL_SECS = int(os.environ.get("TEKMERDB_CONTAINER_TTL_SECS", "3600"))
 # Fixed (engine, mcp) host port pairs -- one per concurrent instance slot.
 # Sized for this box's capacity (see docker/run.sh for the per-container
 # memory/cpu math): 3 slots.
 SLOTS = [(3100, 3101), (3200, 3201), (3300, 3301)]
 DOMAIN_RE = re.compile(r"^[A-Za-z]{1,40}$")
+# Docker container name rules: must start with an alnum, rest is
+# alnum/underscore/dot/dash. Capped at 40 chars, well under docker's own limit.
+NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$")
 
 os.makedirs(SCRATCH_DIR, exist_ok=True)
 
@@ -123,7 +127,7 @@ def _parse_inspect(data):
 
 def _list_containers():
     names_out = subprocess.run(
-        [DOCKER_BIN, "ps", "-a", "--filter", f"name=^{CONTAINER_PREFIX}", "--format", "{{.Names}}"],
+        [DOCKER_BIN, "ps", "-a", "--filter", f"label={CONTAINER_LABEL}", "--format", "{{.Names}}"],
         capture_output=True, text=True, timeout=10,
     )
     names = [n for n in names_out.stdout.split() if n]
@@ -169,7 +173,7 @@ def _reaper_loop():
 threading.Thread(target=_reaper_loop, daemon=True).start()
 
 
-def find_or_launch(domain):
+def find_or_launch(domain, name=None):
     with _containers_lock:
         containers = _list_containers()
         for c in containers:
@@ -179,6 +183,8 @@ def find_or_launch(domain):
 
         existing = next((c for c in live if c["domain"].lower() == domain.lower()), None)
         if existing:
+            # Instance for this domain is already running -- a requested name
+            # only applies to a fresh launch, so it's silently ignored here.
             return {
                 "domain": existing["domain"],
                 "name": existing["name"],
@@ -191,12 +197,16 @@ def find_or_launch(domain):
             active = sorted({c["domain"] for c in live})
             return {"error": "all instance slots are in use", "active_domains": active}, 409
 
+        container_name = name or f"{CONTAINER_PREFIX}{domain.lower()}"
+        if any(c["name"] == container_name for c in live):
+            return {"error": f'container name "{container_name}" is already in use'}, 409
+
         used_ports = {c["engine_port"] for c in live}
         engine_port, mcp_port = next(s for s in SLOTS if s[0] not in used_ports)
 
         try:
             subprocess.run(
-                [RUN_SCRIPT, domain, str(engine_port), str(mcp_port)],
+                [RUN_SCRIPT, domain, str(engine_port), str(mcp_port), container_name],
                 check=True, capture_output=True, text=True, timeout=20,
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
@@ -204,7 +214,7 @@ def find_or_launch(domain):
 
         return {
             "domain": domain,
-            "name": f"{CONTAINER_PREFIX}{domain.lower()}",
+            "name": container_name,
             "state": "launching",
             "mcp_port": mcp_port,
             "ttl_remaining": CONTAINER_TTL_SECS,
@@ -231,7 +241,10 @@ def launch():
     domain = (body.get("domain") or "").strip()
     if not DOMAIN_RE.fullmatch(domain):
         return error("invalid domain")
-    result, status = find_or_launch(domain)
+    name = (body.get("name") or "").strip() or None
+    if name and not NAME_RE.fullmatch(name):
+        return error("invalid container name — use letters, numbers, dots, dashes, or underscores, starting with a letter or number")
+    result, status = find_or_launch(domain, name)
     return jsonify(result), status
 
 

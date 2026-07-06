@@ -115,15 +115,16 @@ async function pollLaunchStatus(domain) {
 document.getElementById("launch-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const domain = domainSelect.value;
+  const name = document.getElementById("container-name-input").value.trim();
   showPrepScreen();
   try {
     const resp = await fetch("/api/demo/launch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ domain }),
+      body: JSON.stringify({ domain, name }),
     });
     const data = await resp.json();
-    if (resp.status === 409) {
+    if (resp.status === 409 && data.active_domains) {
       const active = (data.active_domains || []).map(humanizeDomain).join(", ") || "none";
       showLaunchScreen(`All 3 instance slots are busy right now (active: ${active}). Try again shortly, or pick one of those domains.`);
       return;

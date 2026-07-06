@@ -16,18 +16,24 @@
 #   you can start — nothing stops a 4th — this just keeps 3 safely within
 #   budget. If you need a 4th, lower these first and re-check headroom.
 #
-# Usage: docker/run.sh <domain> <engine-host-port> <mcp-host-port>
-# Example: docker/run.sh Healthcare 3100 3101
+# Usage: docker/run.sh <domain> <engine-host-port> <mcp-host-port> [name]
+# Example: docker/run.sh Healthcare 3100 3101 my-healthcare-demo
+#
+# [name] is the docker container name a demo visitor picked in the UI. It's
+# validated by the Flask app (demo_site/app.py) before reaching this script,
+# not here. Since it's caller-controlled, containers are discovered by the
+# tekmerdb.demo=1 label below rather than by name prefix, so any name works.
 
 set -euo pipefail
 
-DOMAIN="${1:?usage: run.sh <domain> <engine-host-port> <mcp-host-port>}"
-ENGINE_PORT="${2:?usage: run.sh <domain> <engine-host-port> <mcp-host-port>}"
-MCP_PORT="${3:?usage: run.sh <domain> <engine-host-port> <mcp-host-port>}"
-NAME="tekmerdb-$(echo "$DOMAIN" | tr '[:upper:]' '[:lower:]')"
+DOMAIN="${1:?usage: run.sh <domain> <engine-host-port> <mcp-host-port> [name]}"
+ENGINE_PORT="${2:?usage: run.sh <domain> <engine-host-port> <mcp-host-port> [name]}"
+MCP_PORT="${3:?usage: run.sh <domain> <engine-host-port> <mcp-host-port> [name]}"
+NAME="${4:-tekmerdb-$(echo "$DOMAIN" | tr '[:upper:]' '[:lower:]')}"
 
 docker run -d \
     --name "$NAME" \
+    --label tekmerdb.demo=1 \
     --memory 800m \
     --memory-swap 800m \
     --cpus 0.5 \

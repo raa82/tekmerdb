@@ -15,6 +15,9 @@
       <label>Domain
         <select name="domain" id="domain-select" required></select>
       </label>
+      <label>Container name (optional)
+        <input type="text" name="name" id="container-name-input" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_.\-]*" placeholder="e.g. my-healthcare-demo">
+      </label>
       <button type="submit">Launch TekmerDB</button>
     </form>
     <p class="hint launch-error" id="launch-error" hidden></p>
