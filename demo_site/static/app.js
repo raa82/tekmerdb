@@ -43,7 +43,7 @@ const PREP_MESSAGES = [
   "Almost ready…",
 ];
 
-let currentDomain = sessionStorage.getItem("tekmerdb_domain") || null;
+let currentDomain = null;
 let prepMsgTimer = null;
 let launchPollTimer = null;
 let ttlDeadline = null;
@@ -53,7 +53,6 @@ function showLaunchScreen(errMsg) {
   clearTimeout(launchPollTimer);
   currentDomain = null;
   ttlDeadline = null;
-  sessionStorage.removeItem("tekmerdb_domain");
   prepScreen.hidden = true;
   appScreen.hidden = true;
   launchScreen.hidden = false;
@@ -86,7 +85,6 @@ function enterAppScreen(domain, mcpPort) {
   clearInterval(prepMsgTimer);
   clearTimeout(launchPollTimer);
   currentDomain = domain;
-  sessionStorage.setItem("tekmerdb_domain", domain);
   sysExpiredNoteEl.hidden = true;
   prepScreen.hidden = true;
   launchScreen.hidden = true;
@@ -142,12 +140,6 @@ document.getElementById("launch-form").addEventListener("submit", async (e) => {
     showLaunchScreen("network error — try again");
   }
 });
-
-// Resume mid-session across a page refresh, within the same tab.
-if (currentDomain) {
-  showPrepScreen();
-  pollLaunchStatus(currentDomain);
-}
 
 // ── sysinfo / status polling ────────────────────────────────────────────────
 
