@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "tekmerdb-healthcare": {
-      "type": "sse",
-      "url": "http://tekmerdb.com:3101/sse"
-    }
-  }
-}
