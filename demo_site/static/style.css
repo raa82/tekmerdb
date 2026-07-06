@@ -80,6 +80,9 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5rem; }
   align-items: center;
   gap: 1rem;
 }
+/* author `display: flex` above otherwise always beats the `hidden`
+   attribute's default UA display:none -- this is what makes hidden win. */
+.prep-screen[hidden] { display: none; }
 .prep-message { opacity: 0.85; font-size: 1rem; min-height: 1.4em; }
 .spinner {
   width: 2.5rem;
