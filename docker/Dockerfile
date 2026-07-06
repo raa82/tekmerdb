@@ -7,12 +7,10 @@
 #   docker build -f docker/Dockerfile -t tekmerdb:latest .
 #
 # Run (one instance per domain; engine port stays host-loopback-only,
-# mcp port is meant to be reachable by remote MCP clients):
-#   docker run -d --name tekmerdb-healthcare \
-#     -e DOMAIN=Healthcare \
-#     -p 127.0.0.1:3100:3000 \
-#     -p 0.0.0.0:3101:3001 \
-#     tekmerdb:latest
+# mcp port is meant to be reachable by remote MCP clients). Always run via
+# docker/run.sh, not a raw `docker run` — it applies the hard memory/cpu
+# limits this box's capacity depends on:
+#   docker/run.sh Healthcare 3100 3101
 
 # ---------- build stage ----------
 FROM almalinux:10 AS builder
