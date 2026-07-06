@@ -64,6 +64,32 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.5rem; }
   text-align: center;
 }
 .launch-screen button { align-self: center; }
+.launch-ttl-note { text-align: center; font-size: 0.8rem; }
+.launch-error {
+  text-align: center;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.prep-screen {
+  max-width: 640px;
+  margin: 16vh auto 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.prep-message { opacity: 0.85; font-size: 1rem; min-height: 1.4em; }
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--muted) 35%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .sysinfo {
   display: flex;

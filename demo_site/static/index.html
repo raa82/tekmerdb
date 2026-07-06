@@ -17,6 +17,15 @@
       </label>
       <button type="submit">Launch TekmerDB</button>
     </form>
+    <p class="hint launch-ttl-note">Instances run for 60 minutes, then shut down automatically and end your session &mdash; no warning beyond this one.</p>
+    <p class="hint launch-error" id="launch-error" hidden></p>
+  </section>
+
+  <section class="prep-screen" id="prep-screen" hidden>
+    <h1>TekmerDB Demo</h1>
+    <div class="spinner" aria-hidden="true"></div>
+    <p class="prep-message" id="prep-message">Preparing your TekmerDB instance&hellip;</p>
+    <p class="hint launch-ttl-note">This instance will automatically shut down after 60 minutes, ending your session.</p>
   </section>
 
   <div class="app-screen" id="app-screen" hidden>
@@ -28,9 +37,9 @@
   <section class="sysinfo" aria-label="system info">
     <div class="sysinfo-item"><span class="k">domain</span><span class="v" id="sys-domain">&hellip;</span></div>
     <div class="sysinfo-item"><span class="k">pfos</span><span class="v" id="sys-pfos">&hellip;</span></div>
-    <div class="sysinfo-item"><span class="k">last reset</span><span class="v" id="sys-reset">&hellip;</span></div>
+    <div class="sysinfo-item"><span class="k">session ends</span><span class="v" id="sys-ttl">&hellip;</span></div>
     <div class="sysinfo-note">public shared dataset</div>
-    <div class="sysinfo-note">data wiped every hour</div>
+    <div class="sysinfo-note" id="sys-expired-note" hidden>instance expired &mdash; relaunch to continue</div>
   </section>
 
   <main class="layout">
@@ -108,8 +117,8 @@
 
         <section class="panel">
           <h2>Connect via MCP</h2>
-          <p class="hint">Point any MCP client (SSE transport) at this shared demo engine:</p>
-          <pre class="code-block">http://tekmerdb.com:3001/sse</pre>
+          <p class="hint">Point any MCP client (SSE transport) at this instance:</p>
+          <pre class="code-block" id="mcp-endpoint">http://tekmerdb.com:&hellip;/sse</pre>
           <p class="hint">Tools available:</p>
           <ul class="hint-list">
             <li><code>insert_pfo</code></li>

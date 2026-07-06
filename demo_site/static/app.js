@@ -1,7 +1,5 @@
 // TODO: fetch this from a backend endpoint (mirrors the engine's Domain enum,
-// src/engine/pfo.rs) once domain selection is wired up to actually launch a
-// scoped instance. Hardcoded here only because the launch button is
-// frontend-only for now.
+// src/engine/pfo.rs). Hardcoded here for now.
 const DOMAINS = [
   "Healthcare", "LawEnforcement", "CriticalInfrastructure", "Employment",
   "Education", "Migration", "LegalInterpretation", "Finance", "General",
@@ -19,12 +17,6 @@ DOMAINS.forEach((d) => {
   domainSelect.appendChild(opt);
 });
 
-document.getElementById("launch-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  document.getElementById("launch-screen").hidden = true;
-  document.getElementById("app-screen").hidden = false;
-});
-
 document.querySelectorAll(".side-tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".side-tab-btn").forEach((b) => b.classList.remove("active"));
@@ -34,44 +26,182 @@ document.querySelectorAll(".side-tab-btn").forEach((btn) => {
   });
 });
 
+// ── launch flow ────────────────────────────────────────────────────────────
+
+const launchScreen = document.getElementById("launch-screen");
+const prepScreen = document.getElementById("prep-screen");
+const appScreen = document.getElementById("app-screen");
+const launchErrorEl = document.getElementById("launch-error");
+const prepMessageEl = document.getElementById("prep-message");
+const mcpEndpointEl = document.getElementById("mcp-endpoint");
+const sysExpiredNoteEl = document.getElementById("sys-expired-note");
+
+const PREP_MESSAGES = [
+  "Preparing environment…",
+  "Setting up instance…",
+  "Loading domain models…",
+  "Almost ready…",
+];
+
+let currentDomain = sessionStorage.getItem("tekmerdb_domain") || null;
+let prepMsgTimer = null;
+let launchPollTimer = null;
+let ttlDeadline = null;
+
+function showLaunchScreen(errMsg) {
+  clearInterval(prepMsgTimer);
+  clearTimeout(launchPollTimer);
+  currentDomain = null;
+  ttlDeadline = null;
+  sessionStorage.removeItem("tekmerdb_domain");
+  prepScreen.hidden = true;
+  appScreen.hidden = true;
+  launchScreen.hidden = false;
+  if (errMsg) {
+    launchErrorEl.textContent = errMsg;
+    launchErrorEl.hidden = false;
+  } else {
+    launchErrorEl.hidden = true;
+  }
+}
+
+function showPrepScreen() {
+  launchScreen.hidden = true;
+  appScreen.hidden = true;
+  prepScreen.hidden = false;
+  let i = 0;
+  prepMessageEl.textContent = PREP_MESSAGES[0];
+  clearInterval(prepMsgTimer);
+  prepMsgTimer = setInterval(() => {
+    i = (i + 1) % PREP_MESSAGES.length;
+    prepMessageEl.textContent = PREP_MESSAGES[i];
+  }, 2200);
+}
+
+function updateMcpEndpoint(port) {
+  if (port) mcpEndpointEl.textContent = `http://tekmerdb.com:${port}/sse`;
+}
+
+function enterAppScreen(domain, mcpPort) {
+  clearInterval(prepMsgTimer);
+  clearTimeout(launchPollTimer);
+  currentDomain = domain;
+  sessionStorage.setItem("tekmerdb_domain", domain);
+  sysExpiredNoteEl.hidden = true;
+  prepScreen.hidden = true;
+  launchScreen.hidden = true;
+  appScreen.hidden = false;
+  updateMcpEndpoint(mcpPort);
+  refreshStatus();
+}
+
+async function pollLaunchStatus(domain) {
+  try {
+    const resp = await fetch(`/api/demo/launch/status?domain=${encodeURIComponent(domain)}`);
+    const data = await resp.json();
+    if (data.state === "ready") {
+      enterAppScreen(domain, data.mcp_port);
+      return;
+    }
+    if (data.state === "gone") {
+      showLaunchScreen("Instance failed to start — try again.");
+      return;
+    }
+  } catch (e) {
+    // transient — keep polling
+  }
+  launchPollTimer = setTimeout(() => pollLaunchStatus(domain), 1500);
+}
+
+document.getElementById("launch-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const domain = domainSelect.value;
+  showPrepScreen();
+  try {
+    const resp = await fetch("/api/demo/launch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    const data = await resp.json();
+    if (resp.status === 409) {
+      const active = (data.active_domains || []).map(humanizeDomain).join(", ") || "none";
+      showLaunchScreen(`All 3 instance slots are busy right now (active: ${active}). Try again shortly, or pick one of those domains.`);
+      return;
+    }
+    if (!resp.ok) {
+      showLaunchScreen(data.error || "couldn't launch instance");
+      return;
+    }
+    if (data.state === "ready") {
+      enterAppScreen(domain, data.mcp_port);
+    } else {
+      pollLaunchStatus(domain);
+    }
+  } catch (e) {
+    showLaunchScreen("network error — try again");
+  }
+});
+
+// Resume mid-session across a page refresh, within the same tab.
+if (currentDomain) {
+  showPrepScreen();
+  pollLaunchStatus(currentDomain);
+}
+
+// ── sysinfo / status polling ────────────────────────────────────────────────
+
 const consoleEl = document.getElementById("console");
 const sysDomainEl = document.getElementById("sys-domain");
 const sysPfosEl = document.getElementById("sys-pfos");
-const sysResetEl = document.getElementById("sys-reset");
+const sysTtlEl = document.getElementById("sys-ttl");
 
-function relativeTime(epochSeconds) {
-  const diff = Math.max(0, Date.now() / 1000 - epochSeconds);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+function formatCountdown(ms) {
+  if (ms <= 0) return "0:00";
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 async function refreshStatus() {
+  if (!currentDomain) return;
   try {
-    const resp = await fetch("/api/demo/status");
+    const resp = await fetch(`/api/demo/status?domain=${encodeURIComponent(currentDomain)}`);
     const data = await resp.json();
+    if (resp.status === 410) {
+      sysExpiredNoteEl.hidden = false;
+      showLaunchScreen("Your instance expired after 60 minutes. Pick a domain to launch a new one.");
+      return;
+    }
     if (!resp.ok) {
       sysDomainEl.textContent = "unreachable";
       sysPfosEl.textContent = "—";
-      sysResetEl.textContent = "—";
+      sysTtlEl.textContent = "—";
       return;
     }
     sysDomainEl.textContent = data.domain || "—";
     sysPfosEl.textContent = typeof data.pfo_count === "number" ? data.pfo_count : "—";
-    if (typeof data.last_reset === "number") {
-      sysResetEl.textContent = relativeTime(data.last_reset);
-      sysResetEl.title = new Date(data.last_reset * 1000).toLocaleString();
-    } else {
-      sysResetEl.textContent = "—";
+    if (typeof data.ttl_remaining === "number") {
+      ttlDeadline = Date.now() + data.ttl_remaining * 1000;
+      sysTtlEl.textContent = formatCountdown(ttlDeadline - Date.now());
     }
+    updateMcpEndpoint(data.mcp_port);
   } catch (e) {
     sysDomainEl.textContent = "unreachable";
   }
 }
 
-refreshStatus();
 setInterval(refreshStatus, 20000);
+
+setInterval(() => {
+  if (ttlDeadline == null || appScreen.hidden) return;
+  const remaining = ttlDeadline - Date.now();
+  sysTtlEl.textContent = formatCountdown(remaining);
+  if (remaining <= 0) {
+    showLaunchScreen("Your instance expired after 60 minutes. Pick a domain to launch a new one.");
+  }
+}, 1000);
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (m) => ({
@@ -134,6 +264,11 @@ async function runJob(cmd, request) {
   try {
     const resp = await fetch(request.url, request.options);
     const data = await resp.json();
+    if (resp.status === 410) {
+      pending.remove();
+      showLaunchScreen("Your instance expired after 60 minutes. Pick a domain to launch a new one.");
+      return;
+    }
     if (!resp.ok) {
       pending.outerHTML = `<div class="out error">!! ${escapeHtml(data.error || "something went wrong")}</div>`;
       scrollToBottom();
@@ -159,7 +294,7 @@ document.getElementById("pdf-form").addEventListener("submit", async (e) => {
   const filename = form.pdf.files[0] ? form.pdf.files[0].name : "(no file)";
   setBusy(form, true);
   await runJob(`ingest --pdf ${filename}`, {
-    url: "/api/demo/upload",
+    url: `/api/demo/upload?domain=${encodeURIComponent(currentDomain)}`,
     options: { method: "POST", body: new FormData(form) },
     extractClaims: (data) => data.claims,
   });
@@ -172,7 +307,7 @@ document.getElementById("text-form").addEventListener("submit", async (e) => {
   const source = form.source.value.trim();
   setBusy(form, true);
   await runJob(`ingest --text${source ? ` --source ${source}` : ""}`, {
-    url: "/api/demo/upload",
+    url: `/api/demo/upload?domain=${encodeURIComponent(currentDomain)}`,
     options: { method: "POST", body: new FormData(form) },
     extractClaims: (data) => data.claims,
   });
@@ -207,6 +342,11 @@ async function runQueryJob(cmd, url) {
   try {
     const resp = await fetch(url);
     const data = await resp.json();
+    if (resp.status === 410) {
+      pending.remove();
+      showLaunchScreen("Your instance expired after 60 minutes. Pick a domain to launch a new one.");
+      return;
+    }
     if (!resp.ok) {
       pending.outerHTML = `<div class="out error">!! ${escapeHtml(data.error || "something went wrong")}</div>`;
       scrollToBottom();
@@ -225,14 +365,14 @@ document.getElementById("search-form").addEventListener("submit", async (e) => {
   const form = e.target;
   const q = form.q.value.trim();
   setBusy(form, true);
-  await runQueryJob(`search "${q}"`, `/api/demo/search?q=${encodeURIComponent(q)}`);
+  await runQueryJob(`search "${q}"`, `/api/demo/search?domain=${encodeURIComponent(currentDomain)}&q=${encodeURIComponent(q)}`);
   setBusy(form, false);
 });
 
 document.getElementById("sources-btn").addEventListener("click", async (e) => {
   const btn = e.target;
   btn.disabled = true;
-  await runQueryJob("sources --all", "/api/demo/sources");
+  await runQueryJob("sources --all", `/api/demo/sources?domain=${encodeURIComponent(currentDomain)}`);
   btn.disabled = false;
 });
 
@@ -245,7 +385,7 @@ document.getElementById("claim-form").addEventListener("submit", async (e) => {
   const source = fd.get("source");
   setBusy(form, true);
   await runJob(`insert --source ${source} --confidence ${confidence} "${claimText}"`, {
-    url: "/api/demo/insert",
+    url: `/api/demo/insert?domain=${encodeURIComponent(currentDomain)}`,
     options: {
       method: "POST",
       headers: { "Content-Type": "application/json" },
