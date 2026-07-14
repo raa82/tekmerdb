@@ -66,6 +66,36 @@ fi
 TAG="$VERSION"
 info "Version: $TAG"
 
+# ── check installed version ───────────────────────────────────────────────────
+
+INSTALLED_VERSION=""
+if [ -f "$INSTALL_DIR/VERSION" ]; then
+    INSTALLED_VERSION=$(tr -d ' \n' < "$INSTALL_DIR/VERSION")
+fi
+
+if [ -z "$INSTALLED_VERSION" ] && [ -x "$INSTALL_DIR/tekmerdb" ]; then
+    warn "Existing installation found with no VERSION marker — treating as needing upgrade."
+    INSTALLED_VERSION="unknown"
+fi
+
+if [ "$INSTALLED_VERSION" == "$VERSION" ]; then
+    info "TekmerDB $VERSION is already installed and up to date. Nothing to do."
+    exit 0
+elif [ -z "$INSTALLED_VERSION" ]; then
+    info "No existing installation found — installing TekmerDB $TAG."
+else
+    info "Installed version: $INSTALLED_VERSION — upgrading to $TAG."
+fi
+
+# remember which services were running so we can restart them with the new
+# binaries once the upgrade is done — fresh installs have none running yet
+RUNNING_SERVICES=""
+for svc in tekmerdb-server tekmerdb-mcp tekmerdb-cron; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+        RUNNING_SERVICES="$RUNNING_SERVICES $svc"
+    fi
+done
+
 # ── detect architecture ───────────────────────────────────────────────────────
 
 ARCH=$(uname -m)
@@ -276,6 +306,22 @@ done
 
 if [ "$MISSING" -eq 1 ]; then
     error "Installation incomplete — some files are missing."
+fi
+
+echo "$VERSION" > "$INSTALL_DIR/VERSION"
+chown tekmerdb:tekmerdb "$INSTALL_DIR/VERSION"
+
+if [ -n "$RUNNING_SERVICES" ]; then
+    echo ""
+    warn "The following services are running the old binaries:$RUNNING_SERVICES"
+    read -r -p "  Restart them now to load $TAG? [y/N] " RESTART_CONFIRM
+    if [[ "$RESTART_CONFIRM" =~ ^[Yy]$ ]]; then
+        info "Restarting services:$RUNNING_SERVICES"
+        systemctl restart $RUNNING_SERVICES
+    else
+        warn "Skipped restart — old binaries still running. Restart manually when ready:"
+        warn "  systemctl restart$RUNNING_SERVICES"
+    fi
 fi
 
 # ── done ──────────────────────────────────────────────────────────────────────
