@@ -66,35 +66,14 @@ fi
 TAG="$VERSION"
 info "Version: $TAG"
 
-# ── check installed version ───────────────────────────────────────────────────
+# ── check for existing installation ───────────────────────────────────────────
 
-INSTALLED_VERSION=""
-if [ -f "$INSTALL_DIR/VERSION" ]; then
-    INSTALLED_VERSION=$(tr -d ' \n' < "$INSTALL_DIR/VERSION")
-fi
-
-if [ -z "$INSTALLED_VERSION" ] && [ -x "$INSTALL_DIR/tekmerdb" ]; then
-    warn "Existing installation found with no VERSION marker — treating as needing upgrade."
-    INSTALLED_VERSION="unknown"
-fi
-
-if [ "$INSTALLED_VERSION" == "$VERSION" ]; then
-    info "TekmerDB $VERSION is already installed and up to date. Nothing to do."
+if [ -x "$INSTALL_DIR/tekmerdb" ]; then
+    info "TekmerDB is already installed at $INSTALL_DIR — skipping installation."
     exit 0
-elif [ -z "$INSTALLED_VERSION" ]; then
-    info "No existing installation found — installing TekmerDB $TAG."
-else
-    info "Installed version: $INSTALLED_VERSION — upgrading to $TAG."
 fi
 
-# remember which services were running so we can restart them with the new
-# binaries once the upgrade is done — fresh installs have none running yet
-RUNNING_SERVICES=""
-for svc in tekmerdb-server tekmerdb-mcp tekmerdb-cron; do
-    if systemctl is-active --quiet "$svc" 2>/dev/null; then
-        RUNNING_SERVICES="$RUNNING_SERVICES $svc"
-    fi
-done
+info "No existing installation found — installing TekmerDB $TAG."
 
 # ── detect architecture ───────────────────────────────────────────────────────
 
@@ -177,14 +156,13 @@ else
     info "user_jobs.json installed."
 fi
 
-# ── install management scripts ────────────────────────────────────────────────
+# ── install uninstall script ──────────────────────────────────────────────────
 
-cp "$SCRIPT_DIR/install.sh" "$INSTALL_DIR/install.sh"
 if [ -f "$SCRIPT_DIR/uninstall.sh" ]; then
     cp "$SCRIPT_DIR/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
+    chmod +x "$INSTALL_DIR/uninstall.sh"
+    info "uninstall.sh copied to $INSTALL_DIR."
 fi
-chmod +x "$INSTALL_DIR"/*.sh
-info "install.sh / uninstall.sh copied to $INSTALL_DIR."
 
 # ── download models ───────────────────────────────────────────────────────────
 
@@ -315,22 +293,6 @@ done
 
 if [ "$MISSING" -eq 1 ]; then
     error "Installation incomplete — some files are missing."
-fi
-
-echo "$VERSION" > "$INSTALL_DIR/VERSION"
-chown tekmerdb:tekmerdb "$INSTALL_DIR/VERSION"
-
-if [ -n "$RUNNING_SERVICES" ]; then
-    echo ""
-    warn "The following services are running the old binaries:$RUNNING_SERVICES"
-    read -r -p "  Restart them now to load $TAG? [y/N] " RESTART_CONFIRM
-    if [[ "$RESTART_CONFIRM" =~ ^[Yy]$ ]]; then
-        info "Restarting services:$RUNNING_SERVICES"
-        systemctl restart $RUNNING_SERVICES
-    else
-        warn "Skipped restart — old binaries still running. Restart manually when ready:"
-        warn "  systemctl restart$RUNNING_SERVICES"
-    fi
 fi
 
 # ── done ──────────────────────────────────────────────────────────────────────
