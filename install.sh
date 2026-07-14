@@ -156,13 +156,15 @@ else
     info "user_jobs.json installed."
 fi
 
-# ── install uninstall script ──────────────────────────────────────────────────
+# ── install management scripts ────────────────────────────────────────────────
 
-if [ -f "$SCRIPT_DIR/uninstall.sh" ]; then
-    cp "$SCRIPT_DIR/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
-    chmod +x "$INSTALL_DIR/uninstall.sh"
-    info "uninstall.sh copied to $INSTALL_DIR."
-fi
+for script in uninstall.sh upgrade.sh; do
+    if [ -f "$SCRIPT_DIR/$script" ]; then
+        cp "$SCRIPT_DIR/$script" "$INSTALL_DIR/$script"
+        chmod +x "$INSTALL_DIR/$script"
+        info "$script copied to $INSTALL_DIR."
+    fi
+done
 
 # ── download models ───────────────────────────────────────────────────────────
 
@@ -295,6 +297,9 @@ if [ "$MISSING" -eq 1 ]; then
     error "Installation incomplete — some files are missing."
 fi
 
+echo "$VERSION" > "$INSTALL_DIR/VERSION"
+chown tekmerdb:tekmerdb "$INSTALL_DIR/VERSION"
+
 # ── done ──────────────────────────────────────────────────────────────────────
 
 echo ""
@@ -311,6 +316,7 @@ echo "  Models    : $INSTALL_DIR/models/"
 echo "  Data      : $INSTALL_DIR/data/"
 echo "  Logs      : $INSTALL_DIR/log/"
 echo "  Uninstall : $INSTALL_DIR/uninstall.sh"
+echo "  Upgrade   : $INSTALL_DIR/upgrade.sh"
 echo ""
 echo "  Start all services:"
 echo "    systemctl start tekmerdb-server tekmerdb-mcp tekmerdb-cron"
