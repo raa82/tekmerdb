@@ -177,6 +177,15 @@ else
     info "user_jobs.json installed."
 fi
 
+# ── install management scripts ────────────────────────────────────────────────
+
+cp "$SCRIPT_DIR/install.sh" "$INSTALL_DIR/install.sh"
+if [ -f "$SCRIPT_DIR/uninstall.sh" ]; then
+    cp "$SCRIPT_DIR/uninstall.sh" "$INSTALL_DIR/uninstall.sh"
+fi
+chmod +x "$INSTALL_DIR"/*.sh
+info "install.sh / uninstall.sh copied to $INSTALL_DIR."
+
 # ── download models ───────────────────────────────────────────────────────────
 
 info "Checking models..."
@@ -339,6 +348,7 @@ echo "  Jobs      : $INSTALL_DIR/system_jobs.json / user_jobs.json"
 echo "  Models    : $INSTALL_DIR/models/"
 echo "  Data      : $INSTALL_DIR/data/"
 echo "  Logs      : $INSTALL_DIR/log/"
+echo "  Uninstall : $INSTALL_DIR/uninstall.sh"
 echo ""
 echo "  Start all services:"
 echo "    systemctl start tekmerdb-server tekmerdb-mcp tekmerdb-cron"
