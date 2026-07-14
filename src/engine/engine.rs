@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::thread;
 use std::time::Duration;
-use crate::engine::pfo::Pfo;
+use crate::engine::pfo::{Pfo, Domain};
 use crate::engine::config::EngineConfig;
 use crate::engine::sweep::evaluate_new_pfo;
 use crate::engine::fingerprint::Fingerprinter;
@@ -248,7 +248,9 @@ impl Engine {
 
         let count = self.centroid_count.load(Ordering::SeqCst);
 
-        if count >= self.config.cold_start_inserts {
+        if self.config.domain == Domain::General {
+            log_info!("[engine] domain=General — enforcement disabled, accepting");
+        } else if count >= self.config.cold_start_inserts {
             let centroid = self.domain_centroid.lock().unwrap();
             let similarity = cosine_similarity(&pfo.semantic_fingerprint, &centroid);
             log_info!("[engine] domain similarity: {:.3} (threshold: {:.2})",
