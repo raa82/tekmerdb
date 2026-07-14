@@ -82,40 +82,60 @@ if [ -f "$CONF" ]; then
     [ -n "$CFG_PORT" ] && ENGINE_PORT="$CFG_PORT"
 fi
 
+# /status (added in 0.1.2, alongside the version field) is the source of
+# truth when reachable. A 404 there means the engine is up but running a
+# pre-0.1.2 binary that predates the route — that's still a definite "needs
+# upgrade", just without an exact version string, so it's tracked separately
+# from "couldn't reach the engine at all".
 INSTALLED_VERSION=""
-STATUS_JSON=$(curl -fsSL --max-time 5 "http://$ENGINE_HOST:$ENGINE_PORT/status" 2>/dev/null) || true
-if [ -n "$STATUS_JSON" ]; then
-    INSTALLED_VERSION=$(echo "$STATUS_JSON" | grep -m1 '"version"' | sed -E 's/.*"version":"?([^",}]+)"?.*/\1/')
+STALE_PRE_STATUS=0
+
+if HTTP_RESPONSE=$(curl -sS --max-time 5 -w '\n%{http_code}' "http://$ENGINE_HOST:$ENGINE_PORT/status" 2>/dev/null); then
+    HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
+    STATUS_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+    if [ "$HTTP_CODE" = "200" ]; then
+        INSTALLED_VERSION=$(echo "$STATUS_BODY" | grep -m1 '"version"' | sed -E 's/.*"version":"?([^",}]+)"?.*/\1/')
+    else
+        warn "Engine responded but /status returned HTTP $HTTP_CODE — running binary predates the /status endpoint (older than 0.1.2)."
+        STALE_PRE_STATUS=1
+    fi
+else
+    warn "Engine not reachable at http://$ENGINE_HOST:$ENGINE_PORT"
 fi
 
-if [ -z "$INSTALLED_VERSION" ] && [ -f "$INSTALL_DIR/VERSION" ]; then
-    warn "Engine not reachable at http://$ENGINE_HOST:$ENGINE_PORT — using on-disk VERSION marker."
+if [ -z "$INSTALLED_VERSION" ] && [ "$STALE_PRE_STATUS" -eq 0 ] && [ -f "$INSTALL_DIR/VERSION" ]; then
+    info "Using on-disk VERSION marker as fallback."
     INSTALLED_VERSION=$(tr -d ' \n' < "$INSTALL_DIR/VERSION")
 fi
 
-if [ -z "$INSTALLED_VERSION" ]; then
+if [ -z "$INSTALLED_VERSION" ] && [ "$STALE_PRE_STATUS" -eq 0 ]; then
     error "Could not determine the installed version (engine unreachable, no VERSION marker). Start tekmerdb-server and retry."
 fi
 
-info "Installed version: $INSTALLED_VERSION"
+DISPLAY_INSTALLED="${INSTALLED_VERSION:-unknown (pre-0.1.2 build)}"
+info "Installed version: $DISPLAY_INSTALLED"
 
 # ── compare versions ──────────────────────────────────────────────────────────
+# skipped entirely when the installed version is unknown (pre-0.1.2) —
+# we already know for certain that predates $LATEST_VERSION
 
-if [ "$INSTALLED_VERSION" == "$LATEST_VERSION" ]; then
-    info "TekmerDB $INSTALLED_VERSION is already up to date. Nothing to do."
-    exit 0
-fi
+if [ "$STALE_PRE_STATUS" -eq 0 ]; then
+    if [ "$INSTALLED_VERSION" == "$LATEST_VERSION" ]; then
+        info "TekmerDB $INSTALLED_VERSION is already up to date. Nothing to do."
+        exit 0
+    fi
 
-NEWER=$(printf '%s\n%s\n' "$INSTALLED_VERSION" "$LATEST_VERSION" | sort -V | tail -1)
-if [ "$NEWER" != "$LATEST_VERSION" ]; then
-    warn "Installed version ($INSTALLED_VERSION) is newer than the latest release ($LATEST_VERSION). Nothing to do."
-    exit 0
+    NEWER=$(printf '%s\n%s\n' "$INSTALLED_VERSION" "$LATEST_VERSION" | sort -V | tail -1)
+    if [ "$NEWER" != "$LATEST_VERSION" ]; then
+        warn "Installed version ($INSTALLED_VERSION) is newer than the latest release ($LATEST_VERSION). Nothing to do."
+        exit 0
+    fi
 fi
 
 # ── confirm the upgrade ───────────────────────────────────────────────────────
 
 echo ""
-warn "Upgrade available: $INSTALLED_VERSION -> $LATEST_VERSION"
+warn "Upgrade available: $DISPLAY_INSTALLED -> $LATEST_VERSION"
 read -r -p "  Proceed with the upgrade? [y/N] " UPGRADE_CONFIRM
 if [[ ! "$UPGRADE_CONFIRM" =~ ^[Yy]$ ]]; then
     info "Upgrade cancelled."
@@ -192,4 +212,4 @@ else
 fi
 
 echo ""
-info "TekmerDB upgraded: $INSTALLED_VERSION -> $LATEST_VERSION"
+info "TekmerDB upgraded: $DISPLAY_INSTALLED -> $LATEST_VERSION"
