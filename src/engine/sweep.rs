@@ -46,6 +46,19 @@ fn classify_relationship(
         return Ok(ClaimRelationship::Corroboration);
     }
 
+    // hedge/specificity asymmetry — cosine similarity is already symmetric by
+    // construction, so a very high score is itself strong evidence of "same
+    // claim"; a confident entailment in just one direction is enough once
+    // contradiction is ruled out above. The weak direction here reflects the
+    // model's inability to confirm the more general claim from the more
+    // specific/hedged one, not real disagreement (McCoy et al. 2019, "Right
+    // for the Wrong Reasons" — NLI entailment is directional by nature and
+    // isn't expected to be symmetric for same-fact paraphrases).
+    if similarity > 0.90 && (prob_e_ab > 0.85 || prob_e_ba > 0.85) {
+        log_info!("[sweep] asymmetric corroboration — strong one-directional entailment, hedge/specificity mismatch");
+        return Ok(ClaimRelationship::Corroboration);
+    }
+
     // subsumption with cosine tiebreaker at very high similarity
     if (prob_e_ab > 0.5 && prob_n_ba > 0.5) || (prob_e_ba > 0.5 && prob_n_ab > 0.5) {
         if similarity > 0.95 {
